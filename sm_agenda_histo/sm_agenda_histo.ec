@@ -174,7 +174,8 @@ int	iRcv;
 
 	memset(sCommand, '\0', sizeof(sCommand));
 
-   sprintf(sCommand, "iconv -f windows-1252 -t UTF-8 %s > %s ", sArchivoUnx, sArchivoUnx2);
+   /*sprintf(sCommand, "iconv -f windows-1252 -t UTF-8 %s > %s ", sArchivoUnx, sArchivoUnx2);*/
+   sprintf(sCommand, "iconv -f ISO8859-1 -t UTF-8 %s > %s ", sArchivoUnx, sArchivoUnx2);
    iRcv=system(sCommand);
 
 

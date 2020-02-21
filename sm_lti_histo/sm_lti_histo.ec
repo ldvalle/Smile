@@ -1290,8 +1290,8 @@ ClsFactura  regFact;
    sprintf(sLinea, "%s%0.9ld|", sLinea, regFact.nroMedidor);
    
    /* DATA LETTURA ANTERIORE */
-   /*sprintf(sLinea, "%s%s|", sLinea, sFDesde);*/
-   sprintf(sLinea, "%s%s|", sLinea, sFIniVentana);
+   sprintf(sLinea, "%s%s|", sLinea, sFDesde);
+   /*sprintf(sLinea, "%s%s|", sLinea, sFIniVentana);*/
    
    /* LETTURA ENERGIA ATTIVA HP PRELEVATA ANTERIORE F2 */
    strcat(sLinea, "0|");
