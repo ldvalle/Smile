@@ -1,0 +1,75 @@
+clave|cod_mac_numerico|cod_mac_alfa|descripcion|cod_smile
+SRCTYPE   |1|(null)|Lectura Ciclo 1                                   |MWM_VISUAL_MANUAL   
+SRCTYPE   |2|(null)|Lectura Ciclo 2                                   |MWM_VISUAL_MANUAL   
+SRCTYPE   |3|(null)|Lectura Ciclo 3                                   |MWM_VISUAL_MANUAL   
+SRCTYPE   |4|(null)|Lectura Ciclo 4                                   |MWM_VISUAL_MANUAL   
+SRCTYPE   |5|(null)|Lectura Retiro                                    |CAMBIO_MEDIDOR      
+SRCTYPE   |6|(null)|Lectura Instal 6                                  |CAMBIO_MEDIDOR      
+SRCTYPE   |7|(null)|Lectura Instal 7                                  |ATTIVAZIONE         
+SRCDETA   |1|(null)|Lectura Ciclo 1                                   |CICLO               
+SRCDETA   |2|(null)|Lectura Ciclo 2                                   |CICLO               
+SRCDETA   |3|(null)|Lectura Ciclo 3                                   |CICLO               
+SRCDETA   |4|(null)|Lectura Ciclo 4                                   |CICLO               
+SRCDETA   |5|(null)|Lectura Retiro                                    |LAVORO              
+SRCDETA   |6|(null)|Lectura Instal 6                                  |LAVORO              
+SRCDETA   |7|(null)|Lectura Instal 7                                  |LAVORO              
+SRCCODE   |1|(null)|Lectura Verificada                                |V                   
+SRCCODE   |2|(null)|Lectura Inicial                                   |I                   
+SRCCODE   |3|(null)|Lectura Verificada                                |V                   
+SRCCODE   |4|(null)|Lectura Verificada                                |V                   
+SRCCODE   |5|(null)|Lectura Retiro                                    |S                   
+SRCCODE   |6|(null)|Lectura Instalacion                               |D                   
+SRCCODE   |7|(null)|Lectura Instalacion                               |S                   
+TIPLECTU  |1|(null)|Estimacion Automatica                             |F_19_D              
+TIPLECTU  |2|(null)|Lectura Inicial                                   |A_1_D               
+TIPLECTU  |3|(null)|Lectura Verificacion                              |A_1_N               
+TIPLECTU  |4|(null)|Estimacion Manual                                 |H_19_D              
+TIPLECTU  |5|(null)|Lectura Retiro                                    |C_6_M               
+TIPLECTU  |6|(null)|Lectura Instalacion                               |C_6_Q               
+TIPLECTU  |7|(null)|Lectura Instal.Inic.                              |C_6_A               
+ANOMLECTU |(null)|01        |NRO MED NO COINCIDE                               |LECTURA             
+ANOMLECTU |(null)|02        |NO SE LOCALIZA MEDID                              |NO_LECTURA          
+ANOMLECTU |(null)|03        |MED MAL UBIC EN CAJA                              |LECTURA             
+ANOMLECTU |(null)|04        |TAPA DURA                                         |NO_LECTURA          
+ANOMLECTU |(null)|05        |VIDRIO ROTO/ FALTANT                              |LECTURA             
+ANOMLECTU |(null)|06        |LECTURA FORZADA                                   |LECTURA             
+ANOMLECTU |(null)|07        |VIDRIO SUCIO SE LEE                               |LECTURA             
+ANOMLECTU |(null)|08        |CAMBIO DE MEDIDOR                                 |NO_LECTURA          
+ANOMLECTU |(null)|09        |CAJA OBST TEMPORALME                              |NO_LECTURA          
+ANOMLECTU |(null)|10        |MED INT CASA CERRADA                              |NO_LECTURA          
+ANOMLECTU |(null)|11        |DIGITOS NO COINCIDEN                              |LECTURA             
+ANOMLECTU |(null)|12        |MEDIDOR DE ESFERAS                                |LECTURA             
+ANOMLECTU |(null)|13        |LOCAL CLAU-CASA CERR                              |NO_LECTURA          
+ANOMLECTU |(null)|14        |ZONA SIN SUMINISTRO                               |NO_LECTURA          
+ANOMLECTU |(null)|15        |SUMINISTRO CORTADO                                |LECTURA             
+ANOMLECTU |(null)|16        |CORR. DIRECTA C/MEDI                              |LECTURA             
+ANOMLECTU |(null)|17        |FALTA TAPA BORNERA                                |LECTURA             
+ANOMLECTU |(null)|18        |POSIBLE INVERSION                                 |LECTURA             
+ANOMLECTU |(null)|19        |TAP/CAJ FAL/ROTA REC                              |LECTURA             
+ANOMLECTU |(null)|20        |TAP/CAJ FAL/ROTA CAP                              |LECTURA             
+ANOMLECTU |(null)|21        |DOMICILIO NO COINCID                              |LECTURA             
+ANOMLECTU |(null)|22        |MED.NO FIGURA EN TPL                              |LECTURA             
+ANOMLECTU |(null)|23        |PELIGRO EN LECTURA                                |NO_LECTURA          
+ANOMLECTU |(null)|24        |MODIFICACION TARIFA                               |LECTURA             
+ANOMLECTU |(null)|25        |MED FUERA  DE RECORR                              |LECTURA             
+ANOMLECTU |(null)|26        |MED RETIRADO POR MED                              |NO_LECTURA          
+ANOMLECTU |(null)|27        |VISOR SUCIO NO LEE                                |NO_LECTURA          
+ANOMLECTU |(null)|28        |FALTA TAPA DE TOMA                                |LECTURA             
+ANOMLECTU |(null)|29        |ALTURA CAJA INADEC.                               |LECTURA             
+ANOMLECTU |(null)|30        |PRECINTO DE TAPA NO                               |LECTURA             
+ANOMLECTU |(null)|31        |DETER-VIS-MED SE LEE                              |LECTURA             
+ANOMLECTU |(null)|32        |DETER-VIS-MED NO LEE                              |NO_LECTURA          
+ANOMLECTU |(null)|33        |PERNO FALTANTE-ROTO                               |LECTURA             
+ANOMLECTU |(null)|34        |MEDIDOR FUERA RADIO                               |NO_LECTURA          
+ANOMLECTU |(null)|35        |ROBO DEL MEDIDOR                                  |NO_LECTURA          
+ANOMLECTU |(null)|38        |TAPA/CAJA FALT/ROTA                               |LECTURA             
+ANOMLECTU |(null)|39        |RIESGO ELEC EN LECTU                              |NO_LECTURA          
+ANOMLECTU |(null)|40        |RIESGO ELEC EN INSTA                              |LECTURA             
+ANOMLECTU |(null)|41        |LEC REACTIVA FORZADA                              |LECTURA             
+ANOMLECTU |(null)|42        |LEC ACT Y REAC FORZA                              |LECTURA             
+ANOMLECTU |(null)|43        |PREC.TAPA NO (AUTO)                               |NO_LECTURA          
+ANOMLECTU |(null)|45        |MED.ELECTRON.APAGADO                              |NO_LECTURA          
+ANOMLECTU |(null)|48        |DISPLAY FALTA/TITILA                              |LECTURA             
+ANOMLECTU |(null)|49        |PRECINTO DE TAPA DAÑ                              |LECTURA             
+ANOMLECTU |(null)|50        |LUMINARIA ENCENDIDA                               |LECTURA             
+ANOMLECTU |(null)|99        |FALTA LECTURA O ANOM                              |LECTURA             
