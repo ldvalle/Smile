@@ -30,15 +30,25 @@ int   gsArchivoGenera;
 FILE	*pFileMisura;
 FILE	*pFileMisuraAdj;
 
+char	sArchMisuraActUnx[100];
+char	sArchMisuraActAux[100];
+char	sArchMisuraActDos[100];
+char	sSoloArchivoMisuraAct[100];
+
 char	sArchMisuraUnx[100];
 char	sArchMisuraAux[100];
 char	sArchMisuraDos[100];
 char	sSoloArchivoMisura[100];
-
+/*----------------------*/
 char	sArchMisuraAdjUnx[100];
 char	sArchMisuraAdjAux[100];
 char	sArchMisuraAdjDos[100];
 char	sSoloArchivoMisuraAdj[100];
+
+char	sArchMisuraAdjActUnx[100];
+char	sArchMisuraAdjActAux[100];
+char	sArchMisuraAdjActDos[100];
+char	sSoloArchivoMisuraAdjAct[100];
 
 char	sArchLog[100];
 char	sPathSalida[100];
@@ -57,8 +67,9 @@ char  gsHastaFmt[9];
 
 /* Variables Globales Host */
 $ClsLectura	regLectura;
-$long glFechaDesde;
-$long glFechaHasta;
+$long 	glFechaDesde;
+$long 	glFechaHasta;
+$long    lFecha4Y;
 
 char	sMensMail[1024];	
 
@@ -75,7 +86,10 @@ int      iIndexFile=1;
 int      iFilasFile;
 $long    lNroCliente;
 $long    lFechaPivote;
-$long    lFecha4Y;
+$long    lFechaMoveIn;
+$int	 iCorrFacturacion;
+$int	 iPlan;
+int		 iCantidadArchivos=0;
 
 	if(! AnalizarParametros(argc, argv)){
 		exit(0);
@@ -99,56 +113,116 @@ $long    lFecha4Y;
 	/* ********************************************
 				INICIO AREA DE PROCESO
 	********************************************* */
-   $EXECUTE selFechaInicio INTO :lFecha4Y;
+   /* $EXECUTE selFechaInicio INTO :lFecha4Y; */
    
-	if(!AbreArchivos(iIndexFile)){
-		exit(1);	
-	}
-   iIndexFile++;
+
 	cantProcesada=0;
 	cantPreexistente=0;
 	iContaLog=0;
 	
 	/*********************************************
-				AREA CURSOR PPAL
+				AREA CURSOR ACTUAL
+	**********************************************/	
+	iIndexFile=1;
+	for(iPlan=41; iPlan <= 80; iPlan++){
+		if(!AbreArchivosActual(iPlan, iIndexFile)){
+			exit(1);	
+		}
+		iCantidadArchivos++;
+		iIndexFile++;
+		iFilasFile=0;
+
+		$OPEN curClientes USING :iPlan, :iPlan, :lFecha4Y;
+
+		while(LeoCliente(&lNroCliente, &lFechaPivote, &lFechaMoveIn, &iCorrFacturacion)){
+
+			$OPEN curLecturasAct USING :lNroCliente, :iCorrFacturacion;
+
+			while(LeoLecturasAct(&regLectura, lFechaMoveIn)){
+				 GenerarPlanoMisura(regLectura);
+				 
+				 GenerarPlanoAdjunto(regLectura);
+				 
+				 iFilasFile++;      
+			}
+			$CLOSE curLecturasAct;
+			cantProcesada++;
+		  
+			if(iFilasFile > 500000){
+				CerrarArchivos();
+				MoverArchivos();
+				printf("Clientes - Lectura Actual Procesados hasta el momento: %ld\n", cantProcesada);
+				if(!AbreArchivosActual(iPlan, iIndexFile)){
+					exit(1);	
+				}
+				iIndexFile++;
+				iFilasFile=0;         
+				iCantidadArchivos++;
+			}
+		}
+				
+		$CLOSE curClientes;      
+
+		CerrarArchivos();
+
+		MoverArchivos();
+		
+		iIndexFile=1;
+				
+	}  
+	
+	
+	/*********************************************
+				AREA CURSOR HISTORICO
 	**********************************************/
+	cantProcesada=0;
+	iIndexFile=1;
+	
+	for(iPlan=41; iPlan <= 80; iPlan++){
+		if(!AbreArchivos(iPlan, iIndexFile)){
+			exit(1);	
+		}
+	   iIndexFile++;
+	   iCantidadArchivos++;
+	   
+	   iFilasFile=0;
+	   
+	   $OPEN curClientes USING :iPlan, :iPlan, :lFecha4Y;
 
-   iFilasFile=0;
-   
-   $OPEN curClientes;
+	   while(LeoCliente(&lNroCliente, &lFechaPivote, &lFechaMoveIn, &iCorrFacturacion)){
 
-   while(LeoCliente(&lNroCliente, &lFechaPivote)){
+		  $OPEN curLecturas USING :lNroCliente, :lFecha4Y, :iCorrFacturacion;
+	   
+			while(LeoLecturas(&regLectura, lFechaMoveIn)){
+				GenerarPlanoMisura(regLectura);
+			 
+				GenerarPlanoAdjunto(regLectura);
+			 
+				iFilasFile++;      
+			}
+			$CLOSE curLecturas;
+			cantProcesada++;
+		  
+			if(iFilasFile > 500000){
+				CerrarArchivos();
+				MoverArchivos();
+				printf("Clientes Procesados hasta el momento: %ld\n", cantProcesada);
+				if(!AbreArchivos(iPlan, iIndexFile)){
+					exit(1);	
+				}
+				iIndexFile++;
+				iFilasFile=0;
+				iCantidadArchivos++;
+			}
+	   }
+				
+	   $CLOSE curClientes;      
+		CerrarArchivos();
 
-      $OPEN curLecturas USING :lNroCliente, :lFecha4Y;
-   
-   	while(LeoLecturas(&regLectura)){
-         GenerarPlanoMisura(regLectura);
-         
-         GenerarPlanoAdjunto(regLectura);
-         
-         iFilasFile++;      
-      }
-   	$CLOSE curLecturas;
-      cantProcesada++;
-      
-      if(iFilasFile > 500000){
-         CerrarArchivos();
-         MoverArchivos();
-         printf("Clientes Procesados hasta el momento: %ld\n", cantProcesada);
-      	if(!AbreArchivos(iIndexFile)){
-      		exit(1);	
-      	}
-         iIndexFile++;
-         iFilasFile=0;         
-      }
-   }
-   			
-   $CLOSE curClientes;      
-
-	CerrarArchivos();
-
-	MoverArchivos();
-
+		MoverArchivos();
+		iIndexFile=1;
+	}
+	
 	$CLOSE DATABASE;
 
 	$DISCONNECT CURRENT;
@@ -163,8 +237,8 @@ $long    lFecha4Y;
 	printf("==============================================\n");
 	printf("Proceso Concluido.\n");
 	printf("==============================================\n");
-	printf("Clientes Procesados :       %ld \n", cantProcesada);
-   printf("Archivos Generados por tipo:%ld \n", iIndexFile);
+	printf("Clientes Procesados : %ld \n", cantProcesada);
+    printf("Cantidad de Archivos Generados por tipo: %ld \n", iCantidadArchivos);
 	printf("==============================================\n");
 	printf("\nHora antes de comenzar proceso : %s\n", ctime(&hora));						
 
@@ -185,7 +259,9 @@ char	* argv[];
 {
    char  sFechaDesde[11];
    char  sFechaHasta[11];
+   char  sFecha4Y[11];
    
+   memset(sFecha4Y, '\0', sizeof(sFecha4Y));
    memset(sFechaDesde, '\0', sizeof(sFechaDesde));
    memset(sFechaHasta, '\0', sizeof(sFechaHasta));
 
@@ -198,8 +274,11 @@ char	* argv[];
 	}
    giTipoCorrida=atoi(argv[2]);
 	
+   strcpy(sFecha4Y, argv[3]);
+   rdefmtdate(&lFecha4Y, "dd/mm/yyyy", sFecha4Y); 
+   
+   
    if(argc==5){
-      giTipoCorrida=3;/* Modo Delta */
       strcpy(sFechaDesde, argv[3]); 
       strcpy(sFechaHasta, argv[4]);
       
@@ -219,15 +298,75 @@ char	* argv[];
 }
 
 void MensajeParametros(void){
-		printf("Error en Parametros.\n");
-		printf("	<Base> = synergia.\n");
-		printf("	<Tipo Corrida> 0=Normal, 1=Reducida, 3=Delta.\n");
-      printf("	<Fecha Desde (Opcional)> dd/mm/aaaa.\n");
-      printf("	<Fecha Hasta (Opcional)> dd/mm/aaaa.\n");
+	printf("Error en Parametros.\n");
+	printf("	<Base> = synergia.\n");
+	printf("	<Tipo Corrida> 0=Normal, 1=Reducida, 3=Delta.\n");
+	printf("	<Fecha Desde (Obligatoria)> dd/mm/aaaa.\n");
+	printf("	<Fecha Hasta (Opcional)> dd/mm/aaaa.\n");
       
 }
 
-short AbreArchivos(iIndex)
+short AbreArchivosActual(iPlan, iIndex)
+int	  iPlan;
+int   iIndex;
+{
+   char  sTitulos[10000];
+   $char sFecha[9];
+   int   iRcv;
+   
+   memset(sTitulos, '\0', sizeof(sTitulos));
+	
+	memset(sArchMisuraUnx,'\0',sizeof(sArchMisuraUnx));
+	memset(sArchMisuraAux,'\0',sizeof(sArchMisuraAux));
+   memset(sArchMisuraDos,'\0',sizeof(sArchMisuraDos));
+	memset(sSoloArchivoMisura,'\0',sizeof(sSoloArchivoMisura));
+	
+	memset(sArchMisuraAdjUnx,'\0',sizeof(sArchMisuraAdjUnx));
+	memset(sArchMisuraAdjAux,'\0',sizeof(sArchMisuraAdjAux));
+   memset(sArchMisuraAdjDos,'\0',sizeof(sArchMisuraAdjDos));
+	memset(sSoloArchivoMisuraAdj,'\0',sizeof(sSoloArchivoMisuraAdj));
+
+   memset(sFecha,'\0',sizeof(sFecha));
+	memset(sPathSalida,'\0',sizeof(sPathSalida));
+
+   FechaGeneracionFormateada(sFecha);
+   
+	RutaArchivos( sPathSalida, "SAPISU" );
+	alltrim(sPathSalida,' ');
+
+	RutaArchivos( sPathCopia, "SAPCPY" );
+   alltrim(sPathCopia,' ');
+   strcat(sPathCopia, "SMILE/");
+
+	sprintf( sArchMisuraUnx  , "%sLEITURA_ACT_T1_.unx", sPathSalida );
+   sprintf( sArchMisuraAux  , "%sLEITURA_ACT_T1.aux", sPathSalida );
+   sprintf( sArchMisuraDos  , "%sLEITURA_ACT_T1_%s_%d_%d.txt", sPathSalida, sFecha, iPlan, iIndex);
+
+	sprintf( sArchMisuraAdjUnx  , "%sADJUNTO_LEITURA_ACT_T1.unx", sPathSalida );
+   sprintf( sArchMisuraAdjAux  , "%sADJUNTO_LEITURA_ACT_T1.aux", sPathSalida );
+   sprintf( sArchMisuraAdjDos  , "%sADJUNTO_LEITURA_ACT_T1_%s_%d_%d.txt", sPathSalida, sFecha, iPlan, iIndex);
+
+
+	pFileMisura=fopen( sArchMisuraUnx, "w" );
+	if( !pFileMisura ){
+		printf("ERROR al abrir archivo %s.\n", sArchMisuraUnx );
+		return 0;
+	}
+
+   /* ---------------- */
+   
+	pFileMisuraAdj=fopen( sArchMisuraAdjUnx, "w" );
+	if( !pFileMisuraAdj ){
+		printf("ERROR al abrir archivo %s.\n", sArchMisuraAdjUnx );
+		return 0;
+	}
+
+	return 1;	
+}
+
+
+short AbreArchivos(iPlan, iIndex)
+int	  iPlan;
 int   iIndex;
 {
    char  sTitulos[10000];
@@ -260,11 +399,11 @@ int   iIndex;
 
 	sprintf( sArchMisuraUnx  , "%sLEITURA_T1.unx", sPathSalida );
    sprintf( sArchMisuraAux  , "%sLEITURA_T1.aux", sPathSalida );
-   sprintf( sArchMisuraDos  , "%sLEITURA_T1_%s_%d.txt", sPathSalida, sFecha, iIndex);
+   sprintf( sArchMisuraDos  , "%sLEITURA_T1_%s_%d_%d.txt", sPathSalida, sFecha, iPlan, iIndex);
 
 	sprintf( sArchMisuraAdjUnx  , "%sADJUNTO_LEITURA_T1.unx", sPathSalida );
    sprintf( sArchMisuraAdjAux  , "%sADJUNTO_LEITURA_T1.aux", sPathSalida );
-   sprintf( sArchMisuraAdjDos  , "%sADJUNTO_LEITURA_T1_%s_%d.txt", sPathSalida, sFecha, iIndex);
+   sprintf( sArchMisuraAdjDos  , "%sADJUNTO_LEITURA_T1_%s_%d_%d.txt", sPathSalida, sFecha, iPlan, iIndex);
 
 
 	pFileMisura=fopen( sArchMisuraUnx, "w" );
@@ -350,12 +489,15 @@ $char sAux[1000];
    $PREPARE selFechaInicio FROM "SELECT TODAY - 1460 FROM dual ";
    
 	/******** Cursor CLIENTES  ****************/	
-	strcpy(sql, "SELECT c.numero_cliente, s.fecha_pivote FROM cliente c, sap_regi_cliente s ");
+	strcpy(sql, "SELECT c.numero_cliente, NVL(s.fecha_pivote, TODAY), NVL(s.fecha_move_in, TODAY), c.corr_facturacion ");
+	strcat(sql, "FROM cliente c, OUTER sap_regi_cliente s ");
 if(giTipoCorrida==1){
-   strcat(sql, ", migra_activos m ");
+   strcat(sql, ", sm_universo m ");
 }   
-	strcat(sql, "WHERE c.estado_cliente = 0 ");
-   strcat(sql, "AND c.tipo_sum NOT IN (5, 6) ");
+	
+	strcat(sql, "WHERE c.sector = ? ");
+	strcat(sql, "AND c.estado_cliente = 0 ");
+    strcat(sql, "AND c.tipo_sum NOT IN (5, 6) ");
 	strcat(sql, "AND NOT EXISTS (SELECT 1 FROM clientes_ctrol_med cm ");
 	strcat(sql, "WHERE cm.numero_cliente = c.numero_cliente ");
 	strcat(sql, "AND cm.fecha_activacion < TODAY ");
@@ -364,12 +506,73 @@ if(giTipoCorrida==1){
 if(giTipoCorrida==1){
    strcat(sql, "AND m.numero_cliente = c.numero_cliente ");
 }   
+
+	strcat(sql, "UNION ");
+
+	strcat(sql, "SELECT c2.numero_cliente, NVL(s2.fecha_pivote, TODAY), NVL(s2.fecha_move_in, TODAY), c2.corr_facturacion ");
+	strcat(sql, "FROM cliente c2, bal_cliente b, OUTER sap_regi_cliente s2 ");
+if(giTipoCorrida==1){
+   strcat(sql, ", sm_universo m2 ");
+}   
+	
+	strcat(sql, "WHERE c2.sector = ? ");
+	strcat(sql, "AND c2.estado_cliente != 0 ");
+    strcat(sql, "AND c2.tipo_sum NOT IN (5, 6) ");
+    strcat(sql, "AND b.numero_cliente = c2.numero_cliente ");
+    strcat(sql, "AND b.fecha_baja >= ? ");
+	strcat(sql, "AND NOT EXISTS (SELECT 1 FROM clientes_ctrol_med cm2 ");
+	strcat(sql, "WHERE cm2.numero_cliente = c2.numero_cliente ");
+	strcat(sql, "AND cm2.fecha_activacion < TODAY ");
+	strcat(sql, "AND (cm2.fecha_desactiva IS NULL OR cm2.fecha_desactiva > TODAY)) ");	
+   strcat(sql, "AND s2.numero_cliente = c2.numero_cliente ");
+if(giTipoCorrida==1){
+   strcat(sql, "AND m2.numero_cliente = c2.numero_cliente ");
+}   
    
 	$PREPARE selClientes FROM $sql;
 	
 	$DECLARE curClientes CURSOR WITH HOLD FOR selClientes;
 
-   /******** Cursor LECTURAS  ****************/
+	/******** Cursor LECTURAS ACTUALES  ****************/
+   $PREPARE selLecturasAct FROM "SELECT h.numero_cliente, 
+      h.corr_facturacion, 
+      h.fecha_lectura, 
+      h.tipo_lectura, 
+      h.lectura_facturac, 
+      h.lectura_terreno, 
+      h.numero_medidor, 
+      h.marca_medidor,
+      h.clave_lectura, 
+      t1.cod_smile src_deta, 
+      t2.cod_smile src_code, 
+      t3.cod_smile tip_lectu,
+      t4.cod_smile tip_anom,
+      t5.cod_smile source_type, 
+      h2.lectu_factu_reac
+      FROM hislec h, sm_transforma t1, 
+      sm_transforma t2, sm_transforma t3, OUTER sm_transforma t4, 
+      sm_transforma t5, OUTER hislec_reac h2
+      WHERE h.numero_cliente = ?
+      and h.corr_facturacion = ?
+      AND h.tipo_lectura != 8
+      AND t1.clave = 'SRCDETA'
+      AND t1.cod_mac_numerico = h.tipo_lectura
+      AND t2.clave = 'SRCCODE'
+      AND t2.cod_mac_numerico = h.tipo_lectura
+      AND t3.clave = 'TIPLECTU'
+      AND t3.cod_mac_numerico = h.tipo_lectura
+      AND t4.clave = 'ANOMLECTU'
+      AND t4.cod_mac_alfa = h.clave_lectura
+      AND t5.clave = 'SRCTYPE'
+      AND t5.cod_mac_numerico = h.tipo_lectura      
+      AND h2.numero_cliente = h.numero_cliente
+      AND h2.corr_facturacion = h.corr_facturacion
+      AND h2.tipo_lectura = h.tipo_lectura
+      ORDER BY h.fecha_lectura, h.tipo_lectura ASC ";   
+	
+	$DECLARE curLecturasAct CURSOR WITH HOLD FOR selLecturasAct;
+		
+   /******** Cursor LECTURAS HISTO  ****************/
    $PREPARE selLecturas FROM "SELECT h.numero_cliente, 
       h.corr_facturacion, 
       h.fecha_lectura, 
@@ -390,6 +593,7 @@ if(giTipoCorrida==1){
       sm_transforma t5, OUTER hislec_reac h2
       WHERE h.numero_cliente = ?
       AND h.fecha_lectura >= ?
+      and h.corr_facturacion < ?
       AND h.tipo_lectura != 8
       AND t1.clave = 'SRCDETA'
       AND t1.cod_mac_numerico = h.tipo_lectura
@@ -403,6 +607,7 @@ if(giTipoCorrida==1){
       AND t5.cod_mac_numerico = h.tipo_lectura      
       AND h2.numero_cliente = h.numero_cliente
       AND h2.corr_facturacion = h.corr_facturacion
+      AND h2.tipo_lectura = h.tipo_lectura
       ORDER BY h.fecha_lectura, h.tipo_lectura ASC ";   
 	
 	$DECLARE curLecturas CURSOR WITH HOLD FOR selLecturas;
@@ -425,7 +630,7 @@ if(giTipoCorrida==1){
    $PREPARE selModMed FROM $sql;
    
 	/******** Sel Hislec Rectificado *********/
-	strcpy(sql, "SELECT FIRST 1 h1.lectura_rectif, h1.consumo_rectif ");
+	strcpy(sql, "SELECT FIRST 1 h1.lectura_rectif, h1.consumo_rectif, h1.refacturado ");
 	strcat(sql, "FROM hislec_refac h1 ");
 	strcat(sql, "WHERE h1.numero_cliente = ? ");
 	strcat(sql, "AND h1.corr_facturacion = ? ");
@@ -519,14 +724,18 @@ $long iValor=0;
     return iValor;
 }
 
-short LeoCliente(lNroCliente, lFechaPivote)
+short LeoCliente(lNroCliente, lFechaPivote, lFechaMoveIn, iCorrFacturacion)
 $long *lNroCliente;
 $long *lFechaPivote;
+$long *lFechaMoveIn;
+$int  *iCorrFacturacion;
 {
    $long nroCliente;
    $long lFecha;
+   $long lFechaMV;
+   $int  iCorrFactu;
    
-   $FETCH curClientes INTO :nroCliente, :lFecha;
+   $FETCH curClientes INTO :nroCliente, :lFecha, :lFechaMV, :iCorrFactu;
    
     if ( SQLCODE != 0 ){
         return 0;
@@ -534,18 +743,117 @@ $long *lFechaPivote;
    
    *lNroCliente = nroCliente;
    *lFechaPivote = lFecha;
+   *lFechaMoveIn = lFechaMV;
+   *iCorrFacturacion = iCorrFactu;
 
    return 1;
 }
 
-
-short LeoLecturas(regLec)
+short LeoLecturasAct(regLec, lFechaMoveIn)
 $ClsLectura *regLec;
+long	lFechaMoveIn;
 {
    $double dLecturaActiRectif;
    $double dConsumoActiRectif;
    $double dLecturaReacRectif;
    $double dConsumoReacRectif;
+   $char   sRefacturado[2];
+   char		sAuxiliar[21];
+   
+   memset(sRefacturado, '\0', sizeof(sRefacturado));
+   memset(sAuxiliar, '\0', sizeof(sAuxiliar));
+
+	InicializaLectura(regLec);
+   
+	$FETCH curLecturasAct INTO
+      :regLec->numero_cliente,
+      :regLec->corr_facturacion,
+      :regLec->fecha_lectura,       
+      :regLec->tipo_lectura,
+      :regLec->lectura_facturac,
+      :regLec->lectura_terreno,
+      :regLec->numero_medidor,
+      :regLec->marca_medidor,
+      :regLec->clave_lectura,
+      :regLec->src_deta,
+      :regLec->src_code,
+      :regLec->tip_lectu,
+      :regLec->tip_anom,
+      :regLec->src_type,
+      :regLec->lectura_facturac_reac;   
+	
+    if ( SQLCODE != 0 ){
+    	if(SQLCODE == 100){
+			return 0;
+		}else{
+			printf("Error al leer Cursor de Lecturas !!!\nProceso Abortado.\n");
+			exit(1);	
+		}
+    }			
+
+    alltrim(regLec->clave_lectura, ' ');
+    alltrim(regLec->src_deta, ' ');
+    alltrim(regLec->src_code, ' ');
+    alltrim(regLec->tip_lectu, ' ');
+    alltrim(regLec->src_type, ' ');
+    alltrim(regLec->tip_anom, ' ');
+    
+    /* Marca Factura Migrada */
+    if(regLec->fecha_lectura >= lFechaMoveIn){
+		strcpy(regLec->flag_migrado, "S");
+	}else{
+		strcpy(regLec->flag_migrado, "N");
+	}
+    
+    /* Columnizo el tipo de lectura */
+
+    strcpy(sAuxiliar, strReplace(regLec->tip_lectu, "_", "|"));
+    strcpy(regLec->tip_lectu, sAuxiliar);
+
+    
+    /* Buscar si existe el ultimo ajuste activo */
+    $EXECUTE selHislecRefac 
+      INTO :dLecturaActiRectif, :dConsumoActiRectif, :sRefacturado
+      USING :regLec->numero_cliente, :regLec->corr_facturacion, :regLec->tipo_lectura;
+      
+    if(SQLCODE == 0){
+       regLec->lectura_facturac = dLecturaActiRectif;
+       if(sRefacturado[0]=='S'){
+			strcpy(regLec->flag_consumo_pendiente, "N");
+	   }else{
+		    strcpy(regLec->flag_consumo_pendiente, "S");
+	   }
+    }else{
+		strcpy(regLec->flag_consumo_pendiente, "N");
+	}
+      
+    /* Buscar si existe el ultimo ajuste reactivo */
+    if(!risnull(CDOUBLETYPE, (char *)&regLec->lectura_facturac_reac)){
+       $EXECUTE selHislecReacRefac
+         INTO :dLecturaReacRectif, :dConsumoReacRectif
+         USING :regLec->numero_cliente, :regLec->corr_facturacion, :regLec->tipo_lectura;
+         
+       if(SQLCODE == 0){
+          regLec->lectura_facturac_reac = dLecturaReacRectif;
+       }
+   }
+               
+	return 1;	
+}
+
+short LeoLecturas(regLec, lFechaMoveIn)
+$ClsLectura *regLec;
+long	lFechaMoveIn;
+{
+   $double dLecturaActiRectif;
+   $double dConsumoActiRectif;
+   $double dLecturaReacRectif;
+   $double dConsumoReacRectif;
+   $char   sRefacturado[2];
+   char		sAuxiliar[21];
+   
+   memset(sRefacturado, '\0', sizeof(sRefacturado));
+   memset(sAuxiliar, '\0', sizeof(sAuxiliar));
 
 	InicializaLectura(regLec);
    
@@ -582,14 +890,34 @@ $ClsLectura *regLec;
     alltrim(regLec->src_type, ' ');
     alltrim(regLec->tip_anom, ' ');
     
+    /* Marca Factura Migrada */
+    if(regLec->fecha_lectura >= lFechaMoveIn){
+		strcpy(regLec->flag_migrado, "S");
+	}else{
+		strcpy(regLec->flag_migrado, "N");
+	}
+    
+    /* Columnizo el tipo de lectura */
+
+    strcpy(sAuxiliar, strReplace(regLec->tip_lectu, "_", "|"));
+    strcpy(regLec->tip_lectu, sAuxiliar);
+
+    
     /* Buscar si existe el ultimo ajuste activo */
     $EXECUTE selHislecRefac 
-      INTO :dLecturaActiRectif, :dConsumoActiRectif
+      INTO :dLecturaActiRectif, :dConsumoActiRectif, :sRefacturado
       USING :regLec->numero_cliente, :regLec->corr_facturacion, :regLec->tipo_lectura;
       
     if(SQLCODE == 0){
        regLec->lectura_facturac = dLecturaActiRectif;
-    }
+       if(sRefacturado[0]=='S'){
+			strcpy(regLec->flag_consumo_pendiente, "N");
+	   }else{
+		    strcpy(regLec->flag_consumo_pendiente, "S");
+	   }
+    }else{
+		strcpy(regLec->flag_consumo_pendiente, "N");
+	}
       
     /* Buscar si existe el ultimo ajuste reactivo */
     if(!risnull(CDOUBLETYPE, (char *)&regLec->lectura_facturac_reac)){
@@ -624,6 +952,8 @@ $ClsLectura	*regLec;
    memset(regLec->tip_anom, '\0', sizeof(regLec->tip_anom));
    memset(regLec->src_type, '\0', sizeof(regLec->src_type));
    rsetnull(CDOUBLETYPE, (char *) &(regLec->lectura_facturac_reac));
+   memset(regLec->flag_migrado, '\0', sizeof(regLec->flag_migrado));
+   memset(regLec->flag_consumo_pendiente, '\0', sizeof(regLec->flag_consumo_pendiente));
 
 }
 
@@ -804,6 +1134,12 @@ $ClsLectura		regLec;
    
    /* Tipo lectura */
    sprintf(sLinea, "%s%s|", sLinea, regLec.tip_lectu);
+   
+   /* Flag SAP */
+   sprintf(sLinea, "%s%s|", sLinea, regLec.flag_migrado);
+   
+   /* Energia Pendiente */
+   sprintf(sLinea, "%s%s|", sLinea, regLec.flag_consumo_pendiente);
 
 	strcat(sLinea, "\n");
    	
@@ -891,7 +1227,7 @@ $char	FechaActual[11];
 */
 
 
-static char *strReplace(sCadena, cFind, cRemp)
+char *strReplace(sCadena, cFind, cRemp)
 char *sCadena;
 char cFind[2];
 char cRemp[2];
