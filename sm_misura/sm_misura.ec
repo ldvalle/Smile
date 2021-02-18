@@ -89,6 +89,7 @@ $long    lFechaPivote;
 $long    lFechaMoveIn;
 $int	 iCorrFacturacion;
 $int	 iPlan;
+$int	 iTipoLectuActual;
 int		 iCantidadArchivos=0;
 
 	if(! AnalizarParametros(argc, argv)){
@@ -134,7 +135,13 @@ int		 iCantidadArchivos=0;
 
 		$OPEN curClientes USING :iPlan, :iPlan, :lFecha4Y;
 
-		while(LeoCliente(&lNroCliente, &lFechaPivote, &lFechaMoveIn, &iCorrFacturacion)){
+		rsetnull(CLONGTYPE, (char *) &(lNroCliente));
+		rsetnull(CLONGTYPE, (char *) &(lFechaPivote));
+		rsetnull(CLONGTYPE, (char *) &(lFechaMoveIn));
+		rsetnull(CLONGTYPE, (char *) &(iCorrFacturacion));
+		rsetnull(CLONGTYPE, (char *) &(iTipoLectuActual));
+		
+		while(LeoCliente(&lNroCliente, &lFechaPivote, &lFechaMoveIn, &iCorrFacturacion, &iTipoLectuActual)){
 
 			$OPEN curLecturasAct USING :lNroCliente, :iCorrFacturacion;
 
@@ -189,8 +196,17 @@ int		 iCantidadArchivos=0;
 	   
 	   $OPEN curClientes USING :iPlan, :iPlan, :lFecha4Y;
 
-	   while(LeoCliente(&lNroCliente, &lFechaPivote, &lFechaMoveIn, &iCorrFacturacion)){
+		rsetnull(CLONGTYPE, (char *) &(lNroCliente));
+		rsetnull(CLONGTYPE, (char *) &(lFechaPivote));
+		rsetnull(CLONGTYPE, (char *) &(lFechaMoveIn));
+		rsetnull(CLONGTYPE, (char *) &(iCorrFacturacion));
+		rsetnull(CLONGTYPE, (char *) &(iTipoLectuActual));
 
+	   while(LeoCliente(&lNroCliente, &lFechaPivote, &lFechaMoveIn, &iCorrFacturacion, &iTipoLectuActual)){
+
+		  if(iTipoLectuActual == 8)
+			iCorrFacturacion=iCorrFacturacion - 1;
+			
 		  $OPEN curLecturas USING :lNroCliente, :lFecha4Y, :iCorrFacturacion;
 	   
 			while(LeoLecturas(&regLectura, lFechaMoveIn)){
@@ -489,15 +505,16 @@ $char sAux[1000];
    $PREPARE selFechaInicio FROM "SELECT TODAY - 1460 FROM dual ";
    
 	/******** Cursor CLIENTES  ****************/	
-	strcpy(sql, "SELECT c.numero_cliente, NVL(s.fecha_pivote, TODAY), NVL(s.fecha_move_in, TODAY), c.corr_facturacion ");
-	strcat(sql, "FROM cliente c, OUTER sap_regi_cliente s ");
+	strcpy(sql, "SELECT c.numero_cliente, NVL(s.fecha_pivote, TODAY), NVL(s.fecha_move_in, TODAY), c.corr_facturacion, h.tipo_lectura ");
+	strcat(sql, "FROM cliente c, hislec h, OUTER sap_regi_cliente s ");
 if(giTipoCorrida==1){
    strcat(sql, ", sm_universo m ");
 }   
-	
 	strcat(sql, "WHERE c.sector = ? ");
 	strcat(sql, "AND c.estado_cliente = 0 ");
     strcat(sql, "AND c.tipo_sum NOT IN (5, 6) ");
+    strcat(sql, "AND h.numero_cliente = c.numero_cliente ");
+    strcat(sql, "AND h.corr_facturacion = c.corr_facturacion ");
 	strcat(sql, "AND NOT EXISTS (SELECT 1 FROM clientes_ctrol_med cm ");
 	strcat(sql, "WHERE cm.numero_cliente = c.numero_cliente ");
 	strcat(sql, "AND cm.fecha_activacion < TODAY ");
@@ -509,8 +526,8 @@ if(giTipoCorrida==1){
 
 	strcat(sql, "UNION ");
 
-	strcat(sql, "SELECT c2.numero_cliente, NVL(s2.fecha_pivote, TODAY), NVL(s2.fecha_move_in, TODAY), c2.corr_facturacion ");
-	strcat(sql, "FROM cliente c2, bal_cliente b, OUTER sap_regi_cliente s2 ");
+	strcat(sql, "SELECT c2.numero_cliente, NVL(s2.fecha_pivote, TODAY), NVL(s2.fecha_move_in, TODAY), c2.corr_facturacion, h2.tipo_lectura ");
+	strcat(sql, "FROM cliente c2, bal_cliente b, hislec h2, OUTER sap_regi_cliente s2 ");
 if(giTipoCorrida==1){
    strcat(sql, ", sm_universo m2 ");
 }   
@@ -520,6 +537,8 @@ if(giTipoCorrida==1){
     strcat(sql, "AND c2.tipo_sum NOT IN (5, 6) ");
     strcat(sql, "AND b.numero_cliente = c2.numero_cliente ");
     strcat(sql, "AND b.fecha_baja >= ? ");
+    strcat(sql, "AND h2.numero_cliente = c2.numero_cliente ");
+    strcat(sql, "AND h2.corr_facturacion = c2.corr_facturacion ");
 	strcat(sql, "AND NOT EXISTS (SELECT 1 FROM clientes_ctrol_med cm2 ");
 	strcat(sql, "WHERE cm2.numero_cliente = c2.numero_cliente ");
 	strcat(sql, "AND cm2.fecha_activacion < TODAY ");
@@ -554,7 +573,7 @@ if(giTipoCorrida==1){
       sm_transforma t5, OUTER hislec_reac h2
       WHERE h.numero_cliente = ?
       and h.corr_facturacion = ?
-      AND h.tipo_lectura != 8
+      AND h.tipo_lectura NOT IN (5, 6)
       AND t1.clave = 'SRCDETA'
       AND t1.cod_mac_numerico = h.tipo_lectura
       AND t2.clave = 'SRCCODE'
@@ -572,6 +591,42 @@ if(giTipoCorrida==1){
 	
 	$DECLARE curLecturasAct CURSOR WITH HOLD FOR selLecturasAct;
 		
+	/******** Ultima Lectura Real  ****************/
+   $PREPARE selUltiLectuReal FROM "SELECT h.numero_cliente, 
+      h.corr_facturacion, 
+      h.fecha_lectura, 
+      h.tipo_lectura, 
+      h.lectura_facturac, 
+      h.lectura_terreno, 
+      h.numero_medidor, 
+      h.marca_medidor,
+      h.clave_lectura, 
+      t1.cod_smile src_deta, 
+      t2.cod_smile src_code, 
+      t3.cod_smile tip_lectu,
+      t4.cod_smile tip_anom,
+      t5.cod_smile source_type, 
+      h2.lectu_factu_reac
+      FROM hislec h, sm_transforma t1, 
+      sm_transforma t2, sm_transforma t3, OUTER sm_transforma t4, 
+      sm_transforma t5, OUTER hislec_reac h2
+      WHERE h.numero_cliente = ?
+      and h.corr_facturacion = ?
+      AND h.tipo_lectura NOT IN (5, 6, 8)
+      AND t1.clave = 'SRCDETA'
+      AND t1.cod_mac_numerico = h.tipo_lectura
+      AND t2.clave = 'SRCCODE'
+      AND t2.cod_mac_numerico = h.tipo_lectura
+      AND t3.clave = 'TIPLECTU'
+      AND t3.cod_mac_numerico = h.tipo_lectura
+      AND t4.clave = 'ANOMLECTU'
+      AND t4.cod_mac_alfa = h.clave_lectura
+      AND t5.clave = 'SRCTYPE'
+      AND t5.cod_mac_numerico = h.tipo_lectura      
+      AND h2.numero_cliente = h.numero_cliente
+      AND h2.corr_facturacion = h.corr_facturacion
+      AND h2.tipo_lectura = h.tipo_lectura ";
+	
    /******** Cursor LECTURAS HISTO  ****************/
    $PREPARE selLecturas FROM "SELECT h.numero_cliente, 
       h.corr_facturacion, 
@@ -594,7 +649,7 @@ if(giTipoCorrida==1){
       WHERE h.numero_cliente = ?
       AND h.fecha_lectura >= ?
       and h.corr_facturacion < ?
-      AND h.tipo_lectura != 8
+      AND h.tipo_lectura NOT IN (5, 6, 8)
       AND t1.clave = 'SRCDETA'
       AND t1.cod_mac_numerico = h.tipo_lectura
       AND t2.clave = 'SRCCODE'
@@ -724,18 +779,20 @@ $long iValor=0;
     return iValor;
 }
 
-short LeoCliente(lNroCliente, lFechaPivote, lFechaMoveIn, iCorrFacturacion)
+short LeoCliente(lNroCliente, lFechaPivote, lFechaMoveIn, iCorrFacturacion, iTipoLectura)
 $long *lNroCliente;
 $long *lFechaPivote;
 $long *lFechaMoveIn;
 $int  *iCorrFacturacion;
+$int  *iTipoLectura;
 {
    $long nroCliente;
    $long lFecha;
    $long lFechaMV;
    $int  iCorrFactu;
+   $int	 iTipLectu;
    
-   $FETCH curClientes INTO :nroCliente, :lFecha, :lFechaMV, :iCorrFactu;
+   $FETCH curClientes INTO :nroCliente, :lFecha, :lFechaMV, :iCorrFactu, :iTipLectu;
    
     if ( SQLCODE != 0 ){
         return 0;
@@ -745,6 +802,7 @@ $int  *iCorrFacturacion;
    *lFechaPivote = lFecha;
    *lFechaMoveIn = lFechaMV;
    *iCorrFacturacion = iCorrFactu;
+   *iTipoLectura = iTipLectu;
 
    return 1;
 }
@@ -759,6 +817,8 @@ long	lFechaMoveIn;
    $double dConsumoReacRectif;
    $char   sRefacturado[2];
    char		sAuxiliar[21];
+   $long    lNroCliente;
+   $int		iCorrFactu;
    
    memset(sRefacturado, '\0', sizeof(sRefacturado));
    memset(sAuxiliar, '\0', sizeof(sAuxiliar));
@@ -791,6 +851,32 @@ long	lFechaMoveIn;
 		}
     }			
 
+	if(regLec->tipo_lectura == 8){
+		lNroCliente=regLec->numero_cliente;
+		iCorrFactu=regLec->corr_facturacion - 1;
+		
+		InicializaLectura(regLec);
+		
+		$EXECUTE selUltiLectuReal INTO
+		  :regLec->numero_cliente,
+		  :regLec->corr_facturacion,
+		  :regLec->fecha_lectura,       
+		  :regLec->tipo_lectura,
+		  :regLec->lectura_facturac,
+		  :regLec->lectura_terreno,
+		  :regLec->numero_medidor,
+		  :regLec->marca_medidor,
+		  :regLec->clave_lectura,
+		  :regLec->src_deta,
+		  :regLec->src_code,
+		  :regLec->tip_lectu,
+		  :regLec->tip_anom,
+		  :regLec->src_type,
+		  :regLec->lectura_facturac_reac	
+		USING :lNroCliente, :iCorrFactu;
+	}
+	
+	
     alltrim(regLec->clave_lectura, ' ');
     alltrim(regLec->src_deta, ' ');
     alltrim(regLec->src_code, ' ');
@@ -1120,11 +1206,11 @@ $ClsLectura		regLec;
 	memset(sLinea, '\0', sizeof(sLinea));
    memset(sFecha, '\0', sizeof(sFecha));
    
-   rfmtdate(regLec.fecha_lectura, "dd/mm/yyyy 00:00:00", sFecha);
+   rfmtdate(regLec.fecha_lectura, "dd/mm/yyyy", sFecha);
 	
 
    /* Eneltel */
-   sprintf(sLinea, "%0.8ld|", regLec.numero_cliente);
+   sprintf(sLinea, "%0.9ld|", regLec.numero_cliente);
    
    /* POD */
    sprintf(sLinea, "%sAR103E%0.8ld|", sLinea, regLec.numero_cliente);

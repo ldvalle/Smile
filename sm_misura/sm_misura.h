@@ -45,7 +45,7 @@ void  CreaPrepare(void);
 void 	FechaGeneracionFormateada( char *);
 void 	RutaArchivos( char*, char * );
 
-short LeoCliente( long *, long *, long *, int *);
+short LeoCliente( long *, long *, long *, int *, int *);
 short LeoLecturasAct(ClsLectura *, long);
 short LeoLecturas(ClsLectura *, long);
 void  InicializaLectura(ClsLectura *);
