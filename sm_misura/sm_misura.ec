@@ -89,8 +89,10 @@ $long    lFechaPivote;
 $long    lFechaMoveIn;
 $int	 iCorrFacturacion;
 $int	 iPlan;
+$int	 iEstadoCliente;
 $int	 iTipoLectuActual;
 int		 iCantidadArchivos=0;
+long     iCantLecturasActuales=0;
 
 	if(! AnalizarParametros(argc, argv)){
 		exit(0);
@@ -133,26 +135,29 @@ int		 iCantidadArchivos=0;
 		iIndexFile++;
 		iFilasFile=0;
 
-		$OPEN curClientes USING :iPlan, :iPlan, :lFecha4Y;
+		$OPEN curClientes USING :iPlan;
+		/*$OPEN curClientes USING :iPlan, :iPlan, :lFecha4Y;*/
 
 		rsetnull(CLONGTYPE, (char *) &(lNroCliente));
 		rsetnull(CLONGTYPE, (char *) &(lFechaPivote));
 		rsetnull(CLONGTYPE, (char *) &(lFechaMoveIn));
 		rsetnull(CLONGTYPE, (char *) &(iCorrFacturacion));
 		rsetnull(CLONGTYPE, (char *) &(iTipoLectuActual));
+		rsetnull(CINTTYPE, (char *) &(iEstadoCliente));
 		
-		while(LeoCliente(&lNroCliente, &lFechaPivote, &lFechaMoveIn, &iCorrFacturacion, &iTipoLectuActual)){
+		while(LeoCliente(&lNroCliente, &lFechaPivote, &lFechaMoveIn, &iCorrFacturacion, &iEstadoCliente)){
 
-			$OPEN curLecturasAct USING :lNroCliente, :iCorrFacturacion;
+			/*$OPEN curLecturasAct USING :lNroCliente, :iCorrFacturacion;*/
 
-			while(LeoLecturasAct(&regLectura, lFechaMoveIn)){
+			if(LeoLecturasAct(lNroCliente, iCorrFacturacion, &regLectura, lFechaMoveIn)){
 				 GenerarPlanoMisura(regLectura);
 				 
 				 GenerarPlanoAdjunto(regLectura);
 				 
-				 iFilasFile++;      
+				 iFilasFile++; 
+				 iCantLecturasActuales++;     
 			}
-			$CLOSE curLecturasAct;
+			/*$CLOSE curLecturasAct;*/
 			cantProcesada++;
 		  
 			if(iFilasFile > 500000){
@@ -194,20 +199,22 @@ int		 iCantidadArchivos=0;
 	   
 	   iFilasFile=0;
 	   
-	   $OPEN curClientes USING :iPlan, :iPlan, :lFecha4Y;
+	   $OPEN curClientes USING :iPlan;
+	   /*$OPEN curClientes USING :iPlan, :iPlan, :lFecha4Y;*/
 
 		rsetnull(CLONGTYPE, (char *) &(lNroCliente));
 		rsetnull(CLONGTYPE, (char *) &(lFechaPivote));
 		rsetnull(CLONGTYPE, (char *) &(lFechaMoveIn));
 		rsetnull(CLONGTYPE, (char *) &(iCorrFacturacion));
 		rsetnull(CLONGTYPE, (char *) &(iTipoLectuActual));
+		rsetnull(CINTTYPE, (char *) &(iEstadoCliente));
 
-	   while(LeoCliente(&lNroCliente, &lFechaPivote, &lFechaMoveIn, &iCorrFacturacion, &iTipoLectuActual)){
+	   while(LeoCliente(&lNroCliente, &lFechaPivote, &lFechaMoveIn, &iCorrFacturacion, &iEstadoCliente)){
 
-		  if(iTipoLectuActual == 8)
-			iCorrFacturacion=iCorrFacturacion - 1;
-			
-		  $OPEN curLecturas USING :lNroCliente, :lFecha4Y, :iCorrFacturacion;
+		  iCorrFacturacion=getCorrelativoLectu(lNroCliente, iCorrFacturacion);
+		  
+		  if(iCorrFacturacion >= 0){
+			$OPEN curLecturas USING :lNroCliente, :lFecha4Y, :iCorrFacturacion;
 	   
 			while(LeoLecturas(&regLectura, lFechaMoveIn)){
 				GenerarPlanoMisura(regLectura);
@@ -230,6 +237,10 @@ int		 iCantidadArchivos=0;
 				iFilasFile=0;
 				iCantidadArchivos++;
 			}
+			
+		  }else{
+			  printf("Clientes %ld sin lectura historica para informar \n", lNroCliente);
+		  }
 	   }
 				
 	   $CLOSE curClientes;      
@@ -255,6 +266,7 @@ int		 iCantidadArchivos=0;
 	printf("==============================================\n");
 	printf("Clientes Procesados : %ld \n", cantProcesada);
     printf("Cantidad de Archivos Generados por tipo: %ld \n", iCantidadArchivos);
+    printf("Cantidad de Lecturas Actuales Totales: %ld \n", iCantLecturasActuales);
 	printf("==============================================\n");
 	printf("\nHora antes de comenzar proceso : %s\n", ctime(&hora));						
 
@@ -505,16 +517,14 @@ $char sAux[1000];
    $PREPARE selFechaInicio FROM "SELECT TODAY - 1460 FROM dual ";
    
 	/******** Cursor CLIENTES  ****************/	
-	strcpy(sql, "SELECT c.numero_cliente, NVL(s.fecha_pivote, TODAY), NVL(s.fecha_move_in, TODAY), c.corr_facturacion, h.tipo_lectura ");
-	strcat(sql, "FROM cliente c, hislec h, OUTER sap_regi_cliente s ");
+	strcpy(sql, "SELECT c.numero_cliente, NVL(s.fecha_pivote, TODAY), NVL(s.fecha_move_in, TODAY), c.corr_facturacion, c.estado_cliente ");
+	strcat(sql, "FROM cliente c, OUTER sap_regi_cliente s ");
 if(giTipoCorrida==1){
    strcat(sql, ", sm_universo m ");
 }   
 	strcat(sql, "WHERE c.sector = ? ");
 	strcat(sql, "AND c.estado_cliente = 0 ");
     strcat(sql, "AND c.tipo_sum NOT IN (5, 6) ");
-    strcat(sql, "AND h.numero_cliente = c.numero_cliente ");
-    strcat(sql, "AND h.corr_facturacion = c.corr_facturacion ");
 	strcat(sql, "AND NOT EXISTS (SELECT 1 FROM clientes_ctrol_med cm ");
 	strcat(sql, "WHERE cm.numero_cliente = c.numero_cliente ");
 	strcat(sql, "AND cm.fecha_activacion < TODAY ");
@@ -523,11 +533,11 @@ if(giTipoCorrida==1){
 if(giTipoCorrida==1){
    strcat(sql, "AND m.numero_cliente = c.numero_cliente ");
 }   
-
+/*
 	strcat(sql, "UNION ");
 
-	strcat(sql, "SELECT c2.numero_cliente, NVL(s2.fecha_pivote, TODAY), NVL(s2.fecha_move_in, TODAY), c2.corr_facturacion, h2.tipo_lectura ");
-	strcat(sql, "FROM cliente c2, bal_cliente b, hislec h2, OUTER sap_regi_cliente s2 ");
+	strcat(sql, "SELECT c2.numero_cliente, NVL(s2.fecha_pivote, TODAY), NVL(s2.fecha_move_in, TODAY), c2.corr_facturacion, c2.estado_cliente ");
+	strcat(sql, "FROM cliente c2, bal_cliente b, OUTER sap_regi_cliente s2 ");
 if(giTipoCorrida==1){
    strcat(sql, ", sm_universo m2 ");
 }   
@@ -537,8 +547,6 @@ if(giTipoCorrida==1){
     strcat(sql, "AND c2.tipo_sum NOT IN (5, 6) ");
     strcat(sql, "AND b.numero_cliente = c2.numero_cliente ");
     strcat(sql, "AND b.fecha_baja >= ? ");
-    strcat(sql, "AND h2.numero_cliente = c2.numero_cliente ");
-    strcat(sql, "AND h2.corr_facturacion = c2.corr_facturacion ");
 	strcat(sql, "AND NOT EXISTS (SELECT 1 FROM clientes_ctrol_med cm2 ");
 	strcat(sql, "WHERE cm2.numero_cliente = c2.numero_cliente ");
 	strcat(sql, "AND cm2.fecha_activacion < TODAY ");
@@ -547,12 +555,12 @@ if(giTipoCorrida==1){
 if(giTipoCorrida==1){
    strcat(sql, "AND m2.numero_cliente = c2.numero_cliente ");
 }   
-   
+*/   
 	$PREPARE selClientes FROM $sql;
 	
 	$DECLARE curClientes CURSOR WITH HOLD FOR selClientes;
 
-	/******** Cursor LECTURAS ACTUALES  ****************/
+	/******** LECTURAS ACTUALES  ****************/
    $PREPARE selLecturasAct FROM "SELECT h.numero_cliente, 
       h.corr_facturacion, 
       h.fecha_lectura, 
@@ -586,11 +594,12 @@ if(giTipoCorrida==1){
       AND t5.cod_mac_numerico = h.tipo_lectura      
       AND h2.numero_cliente = h.numero_cliente
       AND h2.corr_facturacion = h.corr_facturacion
-      AND h2.tipo_lectura = h.tipo_lectura
+      AND h2.tipo_lectura = h.tipo_lectura ";
+/*      
       ORDER BY h.fecha_lectura, h.tipo_lectura ASC ";   
 	
 	$DECLARE curLecturasAct CURSOR WITH HOLD FOR selLecturasAct;
-		
+*/		
 	/******** Ultima Lectura Real  ****************/
    $PREPARE selUltiLectuReal FROM "SELECT h.numero_cliente, 
       h.corr_facturacion, 
@@ -649,7 +658,7 @@ if(giTipoCorrida==1){
       WHERE h.numero_cliente = ?
       AND h.fecha_lectura >= ?
       and h.corr_facturacion < ?
-      AND h.tipo_lectura NOT IN (5, 6, 8)
+      AND h.tipo_lectura != 8
       AND t1.clave = 'SRCDETA'
       AND t1.cod_mac_numerico = h.tipo_lectura
       AND t2.clave = 'SRCCODE'
@@ -694,7 +703,8 @@ if(giTipoCorrida==1){
 	strcat(sql, "	FROM hislec_refac h2 ");
 	strcat(sql, " 	WHERE h2.numero_cliente = h1.numero_cliente ");
 	strcat(sql, "   AND h2.corr_facturacion = h1.corr_facturacion ");
-	strcat(sql, "   AND h2.tipo_lectura = h1.tipo_lectura) ");
+	strcat(sql, "   AND h2.tipo_lectura = h1.tipo_lectura ");
+	strcat(sql, "   AND h2.refacturado != 'A' ) ");
    
 	$PREPARE selHislecRefac FROM $sql;
 
@@ -734,7 +744,12 @@ if(giTipoCorrida==1){
 
 	$PREPARE selRutaPlanos FROM $sql;
 
-
+	/* Tipo lectura  */
+	$PREPARE selTipoLectu FROM "SELECT tipo_lectura FROM hislec
+		WHERE numero_cliente = ?
+		AND corr_facturacion = ? 
+		AND tipo_lectura NOT IN (5, 6) ";
+		
 }
 
 void FechaGeneracionFormateada( Fecha )
@@ -764,6 +779,7 @@ $char clave[7];
 
 }
 
+/*
 long getCorrelativo(sTipoArchivo)
 $char		sTipoArchivo[11];
 {
@@ -778,21 +794,22 @@ $long iValor=0;
     
     return iValor;
 }
+*/
 
-short LeoCliente(lNroCliente, lFechaPivote, lFechaMoveIn, iCorrFacturacion, iTipoLectura)
+short LeoCliente(lNroCliente, lFechaPivote, lFechaMoveIn, iCorrFacturacion, iEstadoCliente)
 $long *lNroCliente;
 $long *lFechaPivote;
 $long *lFechaMoveIn;
 $int  *iCorrFacturacion;
-$int  *iTipoLectura;
+$int  *iEstadoCliente;
 {
    $long nroCliente;
    $long lFecha;
    $long lFechaMV;
    $int  iCorrFactu;
-   $int	 iTipLectu;
+   $int	 iStsCliente;
    
-   $FETCH curClientes INTO :nroCliente, :lFecha, :lFechaMV, :iCorrFactu, :iTipLectu;
+   $FETCH curClientes INTO :nroCliente, :lFecha, :lFechaMV, :iCorrFactu, :iStsCliente;
    
     if ( SQLCODE != 0 ){
         return 0;
@@ -802,12 +819,14 @@ $int  *iTipoLectura;
    *lFechaPivote = lFecha;
    *lFechaMoveIn = lFechaMV;
    *iCorrFacturacion = iCorrFactu;
-   *iTipoLectura = iTipLectu;
+   *iEstadoCliente = iStsCliente;
 
    return 1;
 }
 
-short LeoLecturasAct(regLec, lFechaMoveIn)
+short LeoLecturasAct(lNroCliente, iCorrFactu, regLec, lFechaMoveIn)
+$long 	lNroCliente;
+$int	iCorrFactu;
 $ClsLectura *regLec;
 long	lFechaMoveIn;
 {
@@ -817,15 +836,14 @@ long	lFechaMoveIn;
    $double dConsumoReacRectif;
    $char   sRefacturado[2];
    char		sAuxiliar[21];
-   $long    lNroCliente;
-   $int		iCorrFactu;
+   int		iVueltas=0;
    
    memset(sRefacturado, '\0', sizeof(sRefacturado));
    memset(sAuxiliar, '\0', sizeof(sAuxiliar));
 
 	InicializaLectura(regLec);
    
-	$FETCH curLecturasAct INTO
+	$EXECUTE selLecturasAct INTO 
       :regLec->numero_cliente,
       :regLec->corr_facturacion,
       :regLec->fecha_lectura,       
@@ -840,19 +858,27 @@ long	lFechaMoveIn;
       :regLec->tip_lectu,
       :regLec->tip_anom,
       :regLec->src_type,
-      :regLec->lectura_facturac_reac;   
+      :regLec->lectura_facturac_reac
+      USING :lNroCliente, :iCorrFactu;  
 	
+
     if ( SQLCODE != 0 ){
     	if(SQLCODE == 100){
+			printf("Cliente %ld sin lectura de ultimo correlativo (lecturas actuales)\n", lNroCliente);
 			return 0;
 		}else{
-			printf("Error al leer Cursor de Lecturas !!!\nProceso Abortado.\n");
-			exit(1);	
+			printf("Error al leer Lecturas (lecturas actuales) !!!\nProceso Abortado.\n");
+			return 0;	
 		}
     }			
 
-	if(regLec->tipo_lectura == 8){
-		lNroCliente=regLec->numero_cliente;
+	if(regLec->tipo_lectura == 8 ){
+		printf("Cliente %ld sin lectura REAL en el ultimo correlativo (lecturas actuales)\n", lNroCliente);
+		return 0;		
+	}
+/*
+	while ((regLec->tipo_lectura == 8 || regLec->tipo_lectura == 5 || regLec->tipo_lectura == 6) && iVueltas < 3){
+		//lNroCliente=regLec->numero_cliente;
 		iCorrFactu=regLec->corr_facturacion - 1;
 		
 		InicializaLectura(regLec);
@@ -874,9 +900,25 @@ long	lFechaMoveIn;
 		  :regLec->src_type,
 		  :regLec->lectura_facturac_reac	
 		USING :lNroCliente, :iCorrFactu;
+
+		if ( SQLCODE != 0 ){
+			if(SQLCODE == 100){
+				printf("Cliente %ld sin lectura actual Fase 1\n", lNroCliente);
+				return 0;
+			}else{
+				printf("Error al leer Lecturas para cliente %ld!!!\nProceso Abortado.\n", lNroCliente);
+				return 0;	
+			}
+		}
+				
+		iVueltas++;
 	}
-	
-	
+
+	if ((regLec->tipo_lectura == 8 || regLec->tipo_lectura == 5 || regLec->tipo_lectura == 6) && iVueltas >=3){
+		printf("Cliente %ld sin lectura actual Fase 2\n", lNroCliente);
+		return 0;	
+	}
+*/	
     alltrim(regLec->clave_lectura, ' ');
     alltrim(regLec->src_deta, ' ');
     alltrim(regLec->src_code, ' ');
@@ -1235,6 +1277,34 @@ $ClsLectura		regLec;
       printf("Error al escribir MisuraAdj\n");
       exit(1);
    }	
+}
+
+int getCorrelativoLectu(lNroCliente, iCorrFacturacion)
+$long	lNroCliente;
+$int	iCorrFacturacion;
+{
+	int	iVueltas=0;
+	$int iTipo;
+	
+	$EXECUTE selTipoLectu INTO :iTipo USING :lNroCliente, :iCorrFacturacion;
+	
+    if ( SQLCODE != 0 ){
+    	if(SQLCODE == 100){
+			printf("Cliente %ld sin lectura de ultimo correlativo (lecturas actuales)\n", lNroCliente);
+			return 0;
+		}else{
+			printf("Error al leer Lecturas (lecturas actuales) !!!\nProceso Abortado.\n");
+			return 0;	
+		}
+    }
+    
+    if(iTipo==0)
+		iCorrFacturacion--;
+	
+	iCorrFacturacion--;
+
+	
+	return iCorrFacturacion;
 }
 
 
