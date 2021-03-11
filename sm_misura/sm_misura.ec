@@ -27,8 +27,16 @@ $include "sm_misura.h";
 int   giTipoCorrida;
 int   gsArchivoGenera;
 
+FILE	*pFileMisuraPend;
+FILE	*pFileMisuraAdjPend;
+
 FILE	*pFileMisura;
 FILE	*pFileMisuraAdj;
+/*----------------------*/
+char	sArchMisuraPendUnx[100];
+char	sArchMisuraPendAux[100];
+char	sArchMisuraPendDos[100];
+char	sSoloArchivoPendMisura[100];
 
 char	sArchMisuraActUnx[100];
 char	sArchMisuraActAux[100];
@@ -40,6 +48,11 @@ char	sArchMisuraAux[100];
 char	sArchMisuraDos[100];
 char	sSoloArchivoMisura[100];
 /*----------------------*/
+char	sArchMisuraAdjPendUnx[100];
+char	sArchMisuraAdjPendAux[100];
+char	sArchMisuraAdjPendDos[100];
+char	sSoloArchivoMisuraAdjPend[100];
+
 char	sArchMisuraAdjUnx[100];
 char	sArchMisuraAdjAux[100];
 char	sArchMisuraAdjDos[100];
@@ -49,6 +62,7 @@ char	sArchMisuraAdjActUnx[100];
 char	sArchMisuraAdjActAux[100];
 char	sArchMisuraAdjActDos[100];
 char	sSoloArchivoMisuraAdjAct[100];
+/*----------------------*/
 
 char	sArchLog[100];
 char	sPathSalida[100];
@@ -67,6 +81,7 @@ char  gsHastaFmt[9];
 
 /* Variables Globales Host */
 $ClsLectura	regLectura;
+$ClsLectura regLectuPend;
 $long 	glFechaDesde;
 $long 	glFechaHasta;
 $long    lFecha4Y;
@@ -93,6 +108,8 @@ $int	 iEstadoCliente;
 $int	 iTipoLectuActual;
 int		 iCantidadArchivos=0;
 long     iCantLecturasActuales=0;
+long	 iCantLecturasPendientes=0;
+$int	 iCorrFactuActual;
 
 	if(! AnalizarParametros(argc, argv)){
 		exit(0);
@@ -150,19 +167,36 @@ long     iCantLecturasActuales=0;
 			/*$OPEN curLecturasAct USING :lNroCliente, :iCorrFacturacion;*/
 
 			if(LeoLecturasAct(lNroCliente, iCorrFacturacion, &regLectura, lFechaMoveIn)){
-				 GenerarPlanoMisura(regLectura);
-				 
-				 GenerarPlanoAdjunto(regLectura);
-				 
-				 iFilasFile++; 
-				 iCantLecturasActuales++;     
+				
+				if(regLectura.tipo_lectura == 8){
+					if(LeoLecturaPend(lNroCliente, iCorrFacturacion, &regLectuPend)){
+						if(regLectuPend.lectura_facturac >= 0){
+							GenerarPlanoMisura(regLectuPend, 1);
+							GenerarPlanoAdjunto(regLectuPend, 1);
+
+							iCantLecturasPendientes++;
+						}else{
+							printf("Cliente %ld lectura 8 con pendiente sin valor en lecturas\n",lNroCliente);												
+						}
+					}else{
+						printf("Cliente %ld con lectura 8 sin pendiente\n",lNroCliente);											
+					}
+				}else{
+					GenerarPlanoMisura(regLectura, 0);
+					GenerarPlanoAdjunto(regLectura, 0);
+
+					iFilasFile++; 
+					iCantLecturasActuales++;
+				}
 			}
 			/*$CLOSE curLecturasAct;*/
 			cantProcesada++;
 		  
 			if(iFilasFile > 500000){
 				CerrarArchivos();
-				MoverArchivos();
+				fclose(pFileMisuraPend);
+				fclose(pFileMisuraAdjPend);
+				MoverArchivos(1);
 				printf("Clientes - Lectura Actual Procesados hasta el momento: %ld\n", cantProcesada);
 				if(!AbreArchivosActual(iPlan, iIndexFile)){
 					exit(1);	
@@ -176,8 +210,9 @@ long     iCantLecturasActuales=0;
 		$CLOSE curClientes;      
 
 		CerrarArchivos();
-
-		MoverArchivos();
+		fclose(pFileMisuraPend);
+		fclose(pFileMisuraAdjPend);
+		MoverArchivos(1);
 		
 		iIndexFile=1;
 				
@@ -210,16 +245,15 @@ long     iCantLecturasActuales=0;
 		rsetnull(CINTTYPE, (char *) &(iEstadoCliente));
 
 	   while(LeoCliente(&lNroCliente, &lFechaPivote, &lFechaMoveIn, &iCorrFacturacion, &iEstadoCliente)){
-
+		  iCorrFactuActual=iCorrFacturacion;
 		  iCorrFacturacion=getCorrelativoLectu(lNroCliente, iCorrFacturacion);
 		  
 		  if(iCorrFacturacion >= 0){
-			$OPEN curLecturas USING :lNroCliente, :lFecha4Y, :iCorrFacturacion;
+			$OPEN curLecturas USING :lNroCliente, :lFecha4Y, :iCorrFacturacion, :lNroCliente, :iCorrFactuActual;
 	   
 			while(LeoLecturas(&regLectura, lFechaMoveIn)){
-				GenerarPlanoMisura(regLectura);
-			 
-				GenerarPlanoAdjunto(regLectura);
+				GenerarPlanoMisura(regLectura, 0);
+				GenerarPlanoAdjunto(regLectura, 0);
 			 
 				iFilasFile++;      
 			}
@@ -228,7 +262,7 @@ long     iCantLecturasActuales=0;
 		  
 			if(iFilasFile > 500000){
 				CerrarArchivos();
-				MoverArchivos();
+				MoverArchivos(0);
 				printf("Clientes Procesados hasta el momento: %ld\n", cantProcesada);
 				if(!AbreArchivos(iPlan, iIndexFile)){
 					exit(1);	
@@ -246,7 +280,7 @@ long     iCantLecturasActuales=0;
 	   $CLOSE curClientes;      
 		CerrarArchivos();
 
-		MoverArchivos();
+		MoverArchivos(0);
 		iIndexFile=1;
 	}
 	
@@ -267,6 +301,7 @@ long     iCantLecturasActuales=0;
 	printf("Clientes Procesados : %ld \n", cantProcesada);
     printf("Cantidad de Archivos Generados por tipo: %ld \n", iCantidadArchivos);
     printf("Cantidad de Lecturas Actuales Totales: %ld \n", iCantLecturasActuales);
+    printf("Cantidad de Lecturas Pendientes Totales: %ld \n", iCantLecturasPendientes);    
 	printf("==============================================\n");
 	printf("\nHora antes de comenzar proceso : %s\n", ctime(&hora));						
 
@@ -342,47 +377,81 @@ int   iIndex;
    $char sFecha[9];
    int   iRcv;
    
-   memset(sTitulos, '\0', sizeof(sTitulos));
-	
+	memset(sTitulos, '\0', sizeof(sTitulos));
+/*--------Misura Pendiente de facturar-------*/
+	memset(sArchMisuraPendUnx,'\0',sizeof(sArchMisuraPendUnx));
+	memset(sArchMisuraPendAux,'\0',sizeof(sArchMisuraPendAux));
+	memset(sArchMisuraPendDos,'\0',sizeof(sArchMisuraPendDos));
+	memset(sSoloArchivoPendMisura,'\0',sizeof(sSoloArchivoPendMisura));
+/*--------Adjunto Misura Pendiente de facturar-------*/
+	memset(sArchMisuraAdjPendUnx,'\0',sizeof(sArchMisuraAdjPendUnx));
+	memset(sArchMisuraAdjPendAux,'\0',sizeof(sArchMisuraAdjPendAux));
+	memset(sArchMisuraAdjPendDos,'\0',sizeof(sArchMisuraAdjPendDos));
+	memset(sSoloArchivoMisuraAdjPend,'\0',sizeof(sSoloArchivoMisuraAdjPend));
+/*-------Misura--------*/
 	memset(sArchMisuraUnx,'\0',sizeof(sArchMisuraUnx));
 	memset(sArchMisuraAux,'\0',sizeof(sArchMisuraAux));
-   memset(sArchMisuraDos,'\0',sizeof(sArchMisuraDos));
+	memset(sArchMisuraDos,'\0',sizeof(sArchMisuraDos));
 	memset(sSoloArchivoMisura,'\0',sizeof(sSoloArchivoMisura));
-	
+/*--------Adjunto Misura-------*/
 	memset(sArchMisuraAdjUnx,'\0',sizeof(sArchMisuraAdjUnx));
 	memset(sArchMisuraAdjAux,'\0',sizeof(sArchMisuraAdjAux));
-   memset(sArchMisuraAdjDos,'\0',sizeof(sArchMisuraAdjDos));
+	memset(sArchMisuraAdjDos,'\0',sizeof(sArchMisuraAdjDos));
 	memset(sSoloArchivoMisuraAdj,'\0',sizeof(sSoloArchivoMisuraAdj));
 
-   memset(sFecha,'\0',sizeof(sFecha));
+	memset(sFecha,'\0',sizeof(sFecha));
 	memset(sPathSalida,'\0',sizeof(sPathSalida));
 
-   FechaGeneracionFormateada(sFecha);
-   
+	FechaGeneracionFormateada(sFecha);
+
 	RutaArchivos( sPathSalida, "SAPISU" );
 	alltrim(sPathSalida,' ');
 
 	RutaArchivos( sPathCopia, "SAPCPY" );
-   alltrim(sPathCopia,' ');
-   strcat(sPathCopia, "SMILE/");
+	alltrim(sPathCopia,' ');
+	strcat(sPathCopia, "SMILE/");
 
+/*--------Misura Pendiente de facturar-------*/
+	sprintf( sArchMisuraPendUnx  , "%sMISURA_PENDIENTE_T1_.unx", sPathSalida );
+	sprintf( sArchMisuraPendAux  , "%sMISURA_PENDIENTE_T1.aux", sPathSalida );
+	sprintf( sArchMisuraPendDos  , "%sMISURA_PENDIENTE_T1_%s_%d_%d.txt", sPathSalida, sFecha, iPlan, iIndex);
+
+/*--------Adjunto Misura Pendiente de facturar-------*/
+	sprintf( sArchMisuraAdjPendUnx  , "%sADJUNTO_MISURA_PENDIENTE_T1.unx", sPathSalida );
+	sprintf( sArchMisuraAdjPendAux  , "%sADJUNTO_MISURA_PENDIENTE_T1.aux", sPathSalida );
+	sprintf( sArchMisuraAdjPendDos  , "%sADJUNTO_MISURA_PENDIENTE_T1_%s_%d_%d.txt", sPathSalida, sFecha, iPlan, iIndex);
+
+/*-------Misura--------*/
 	sprintf( sArchMisuraUnx  , "%sLEITURA_ACT_T1_.unx", sPathSalida );
-   sprintf( sArchMisuraAux  , "%sLEITURA_ACT_T1.aux", sPathSalida );
-   sprintf( sArchMisuraDos  , "%sLEITURA_ACT_T1_%s_%d_%d.txt", sPathSalida, sFecha, iPlan, iIndex);
-
+	sprintf( sArchMisuraAux  , "%sLEITURA_ACT_T1.aux", sPathSalida );
+	sprintf( sArchMisuraDos  , "%sLEITURA_ACT_T1_%s_%d_%d.txt", sPathSalida, sFecha, iPlan, iIndex);
+/*--------Adjunto Misura-------*/
 	sprintf( sArchMisuraAdjUnx  , "%sADJUNTO_LEITURA_ACT_T1.unx", sPathSalida );
-   sprintf( sArchMisuraAdjAux  , "%sADJUNTO_LEITURA_ACT_T1.aux", sPathSalida );
-   sprintf( sArchMisuraAdjDos  , "%sADJUNTO_LEITURA_ACT_T1_%s_%d_%d.txt", sPathSalida, sFecha, iPlan, iIndex);
+	sprintf( sArchMisuraAdjAux  , "%sADJUNTO_LEITURA_ACT_T1.aux", sPathSalida );
+	sprintf( sArchMisuraAdjDos  , "%sADJUNTO_LEITURA_ACT_T1_%s_%d_%d.txt", sPathSalida, sFecha, iPlan, iIndex);
 
 
+/*--------Misura Pendiente de facturar-------*/
+	pFileMisuraPend=fopen( sArchMisuraPendUnx, "w" );
+	if( !pFileMisuraPend ){
+		printf("ERROR al abrir archivo %s.\n", sArchMisuraPendUnx );
+		return 0;
+	}
+
+/*--------Adjunto Misura Pendiente de facturar-------*/
+	pFileMisuraAdjPend=fopen( sArchMisuraAdjPendUnx, "w" );
+	if( !pFileMisuraAdjPend ){
+		printf("ERROR al abrir archivo %s.\n", sArchMisuraAdjPendUnx );
+		return 0;
+	}
+
+/*-------Misura--------*/
 	pFileMisura=fopen( sArchMisuraUnx, "w" );
 	if( !pFileMisura ){
 		printf("ERROR al abrir archivo %s.\n", sArchMisuraUnx );
 		return 0;
 	}
-
-   /* ---------------- */
-   
+/*--------Adjunto Misura-------*/
 	pFileMisuraAdj=fopen( sArchMisuraAdjUnx, "w" );
 	if( !pFileMisuraAdj ){
 		printf("ERROR al abrir archivo %s.\n", sArchMisuraAdjUnx );
@@ -458,13 +527,49 @@ void CerrarArchivos(void)
 
 }
 
-void MoverArchivos(void){
+void MoverArchivos(iFlag)
+int	iFlag;
+{
 char	sCommand[10000];
 int	iRcv, i;
 	
-   sprintf(sCommand, "iconv -f WINDOWS-1252 -t UTF-8 %s > %s ", sArchMisuraUnx, sArchMisuraDos);
-   iRcv=system(sCommand);
-   
+	if(iFlag==1){
+		/* ------ Misura Pendiente ------- */
+		sprintf(sCommand, "iconv -f WINDOWS-1252 -t UTF-8 %s > %s ", sArchMisuraPendUnx, sArchMisuraPendDos);
+		iRcv=system(sCommand);
+
+		sprintf(sCommand, "chmod 777 %s", sArchMisuraPendDos);
+		iRcv=system(sCommand);
+
+
+		sprintf(sCommand, "mv %s %s", sArchMisuraPendDos, sPathCopia);
+		iRcv=system(sCommand);
+
+		if(iRcv >= 0){        
+			sprintf(sCommand, "rm %s", sArchMisuraPendUnx);
+			iRcv=system(sCommand);
+		}
+			
+		/* ------ Adjunto Misura Pendiente ------- */	
+		sprintf(sCommand, "iconv -f WINDOWS-1252 -t UTF-8 %s > %s ", sArchMisuraAdjPendUnx, sArchMisuraAdjPendDos);
+		iRcv=system(sCommand);
+
+		sprintf(sCommand, "chmod 777 %s", sArchMisuraAdjPendDos);
+		iRcv=system(sCommand);
+
+		sprintf(sCommand, "mv %s %s", sArchMisuraAdjPendDos, sPathCopia);
+		iRcv=system(sCommand);
+
+		if(iRcv >= 0){        
+		  sprintf(sCommand, "rm %s", sArchMisuraAdjPendUnx);
+		  iRcv=system(sCommand);
+		}  
+	}
+	
+	/* ------- Misura ------ */
+	sprintf(sCommand, "iconv -f WINDOWS-1252 -t UTF-8 %s > %s ", sArchMisuraUnx, sArchMisuraDos);
+	iRcv=system(sCommand);
+
 	sprintf(sCommand, "chmod 777 %s", sArchMisuraDos);
 	iRcv=system(sCommand);
 
@@ -472,26 +577,26 @@ int	iRcv, i;
 	sprintf(sCommand, "mv %s %s", sArchMisuraDos, sPathCopia);
 	iRcv=system(sCommand);
 
-   if(iRcv >= 0){        
-      sprintf(sCommand, "rm %s", sArchMisuraUnx);
-      iRcv=system(sCommand);
-   }         
+	if(iRcv >= 0){        
+		sprintf(sCommand, "rm %s", sArchMisuraUnx);
+		iRcv=system(sCommand);
+	}         
    
-   /* ------------- */
+   /* -------Adjunto Misura------ */
    
-   sprintf(sCommand, "iconv -f WINDOWS-1252 -t UTF-8 %s > %s ", sArchMisuraAdjUnx, sArchMisuraAdjDos);
-   iRcv=system(sCommand);
-   
+	sprintf(sCommand, "iconv -f WINDOWS-1252 -t UTF-8 %s > %s ", sArchMisuraAdjUnx, sArchMisuraAdjDos);
+	iRcv=system(sCommand);
+
 	sprintf(sCommand, "chmod 777 %s", sArchMisuraAdjDos);
 	iRcv=system(sCommand);
 
 	sprintf(sCommand, "mv %s %s", sArchMisuraAdjDos, sPathCopia);
 	iRcv=system(sCommand);
 
-   if(iRcv >= 0){        
-      sprintf(sCommand, "rm %s", sArchMisuraAdjUnx);
-      iRcv=system(sCommand);
-   }         
+	if(iRcv >= 0){        
+	  sprintf(sCommand, "rm %s", sArchMisuraAdjUnx);
+	  iRcv=system(sCommand);
+	}         
 
 	
 }
@@ -576,9 +681,9 @@ if(giTipoCorrida==1){
       t4.cod_smile tip_anom,
       t5.cod_smile source_type, 
       h2.lectu_factu_reac
-      FROM hislec h, sm_transforma t1, 
-      sm_transforma t2, sm_transforma t3, OUTER sm_transforma t4, 
-      sm_transforma t5, OUTER hislec_reac h2
+      FROM hislec h, OUTER sm_transforma t1, 
+      OUTER sm_transforma t2, OUTER sm_transforma t3, OUTER sm_transforma t4, 
+      OUTER sm_transforma t5, OUTER hislec_reac h2
       WHERE h.numero_cliente = ?
       and h.corr_facturacion = ?
       AND h.tipo_lectura NOT IN (5, 6)
@@ -600,6 +705,56 @@ if(giTipoCorrida==1){
 	
 	$DECLARE curLecturasAct CURSOR WITH HOLD FOR selLecturasAct;
 */		
+
+	/******** Lectura NO Facturada *********/
+	$PREPARE selFPLectu FROM "SELECT FIRST 1 f1.numero_cliente,
+		f1.corr_facturacion,
+		CASE 
+		   WHEN f1.fecha_lectura_ver IS NULL THEN f1.fecha_lectura
+		   ELSE f1.fecha_lectura_ver
+		END fecha_lectura_t2,
+		f1.tipo_lectura,
+		CASE
+		   WHEN f1.tipo_lectura = 1 THEN f1.lectura_prop
+		   WHEN f1.tipo_lectura = 4 THEN f1.lectura_a_fact
+		   WHEN f1.ind_verificacion='S' AND f1.tipo_lectura in (2,3) AND f1.fecha_lectura_ver IS NOT NULL THEN f1.lectura_verif
+		   WHEN f1.ind_verificacion='S' AND f1.tipo_lectura = 2 AND f1.fecha_lectura_ver IS NULL THEN f1.lectura_actual
+		   WHEN (f1.ind_verificacion !='S' or f1.ind_verificacion IS NULL) AND f1.tipo_lectura = 2 THEN f1.lectura_actual  
+		   ELSE -1
+		END lectura_activa,
+		f1.numero_medidor,
+		f1.marca_medidor,
+		f1.clave_lectura_act,
+		t1.cod_smile src_deta, 
+		t2.cod_smile src_code, 
+		t3.cod_smile tip_lectu,
+		t4.cod_smile tip_anom,
+		t5.cod_smile source_type, 
+		CASE
+		   WHEN f1.tipo_lectura_reac = 1 THEN f1.lectura_prop_reac
+		   WHEN f1.tipo_lectura_reac = 4 THEN f1.lectu_a_fact_reac
+		   WHEN f1.ind_verificacion='S' AND f1.tipo_lectura_reac in (2,3) AND f1.fecha_lectura_ver IS NOT NULL THEN f1.lectura_verif_reac
+		   WHEN f1.ind_verificacion='S' AND f1.tipo_lectura_reac = 2 AND f1.fecha_lectura_ver IS NULL THEN f1.lectu_actual_reac
+		   WHEN (f1.ind_verificacion !='S' or f1.ind_verificacion IS NULL) AND f1.tipo_lectura_reac = 2 THEN f1.lectu_actual_reac 
+		   ELSE -1
+		END lectura_reactiva
+		FROM fp_lectu f1, sm_transforma t1, 
+			  sm_transforma t2, sm_transforma t3, OUTER sm_transforma t4, 
+			  sm_transforma t5
+		WHERE f1.numero_cliente = ?
+		AND f1.corr_facturacion = ?
+		AND t1.clave = 'SRCDETA'
+		AND t1.cod_mac_numerico = f1.tipo_lectura
+		AND t2.clave = 'SRCCODE'
+		AND t2.cod_mac_numerico = f1.tipo_lectura
+		AND t3.clave = 'TIPLECTU'
+		AND t3.cod_mac_numerico = f1.tipo_lectura
+		AND t4.clave = 'ANOMLECTU'
+		AND t4.cod_mac_alfa = f1.clave_lectura_act
+		AND t5.clave = 'SRCTYPE'
+		AND t5.cod_mac_numerico = f1.tipo_lectura ";
+	
+	
 	/******** Ultima Lectura Real  ****************/
    $PREPARE selUltiLectuReal FROM "SELECT h.numero_cliente, 
       h.corr_facturacion, 
@@ -657,7 +812,7 @@ if(giTipoCorrida==1){
       sm_transforma t5, OUTER hislec_reac h2
       WHERE h.numero_cliente = ?
       AND h.fecha_lectura >= ?
-      and h.corr_facturacion < ?
+      and h.corr_facturacion <= ?
       AND h.tipo_lectura != 8
       AND t1.clave = 'SRCDETA'
       AND t1.cod_mac_numerico = h.tipo_lectura
@@ -672,10 +827,87 @@ if(giTipoCorrida==1){
       AND h2.numero_cliente = h.numero_cliente
       AND h2.corr_facturacion = h.corr_facturacion
       AND h2.tipo_lectura = h.tipo_lectura
-      ORDER BY h.fecha_lectura, h.tipo_lectura ASC ";   
+      UNION
+	  SELECT h.numero_cliente, 
+      h.corr_facturacion, 
+      h.fecha_lectura, 
+      h.tipo_lectura, 
+      h.lectura_facturac, 
+      h.lectura_terreno, 
+      h.numero_medidor, 
+      h.marca_medidor,
+      h.clave_lectura, 
+      t1.cod_smile src_deta, 
+      t2.cod_smile src_code, 
+      t3.cod_smile tip_lectu,
+      t4.cod_smile tip_anom,
+      t5.cod_smile source_type, 
+      h2.lectu_factu_reac
+      FROM hislec h, sm_transforma t1, 
+      sm_transforma t2, sm_transforma t3, OUTER sm_transforma t4, 
+      sm_transforma t5, OUTER hislec_reac h2
+      WHERE h.numero_cliente = ?
+      and h.corr_facturacion = ?
+      AND h.tipo_lectura IN (5, 6)
+      AND t1.clave = 'SRCDETA'
+      AND t1.cod_mac_numerico = h.tipo_lectura
+      AND t2.clave = 'SRCCODE'
+      AND t2.cod_mac_numerico = h.tipo_lectura
+      AND t3.clave = 'TIPLECTU'
+      AND t3.cod_mac_numerico = h.tipo_lectura
+      AND t4.clave = 'ANOMLECTU'
+      AND t4.cod_mac_alfa = h.clave_lectura
+      AND t5.clave = 'SRCTYPE'
+      AND t5.cod_mac_numerico = h.tipo_lectura      
+      AND h2.numero_cliente = h.numero_cliente
+      AND h2.corr_facturacion = h.corr_facturacion
+      AND h2.tipo_lectura = h.tipo_lectura      
+      ORDER BY 3, 4 ASC ";   
 	
 	$DECLARE curLecturas CURSOR WITH HOLD FOR selLecturas;
    
+	/********* Lectura no Facturada **********/
+/*	
+SELECT FIRST 1 f1.sucursal,
+f1.sector,
+f1.tarifa,
+CASE 
+   WHEN f1.fecha_lectura_ver IS NULL THEN f1.fecha_lectura
+   ELSE f1.fecha_lectura_ver
+END fecha_lectura_t2,
+f1.cons_activa_p1 + f1.cons_activa_p2 consumo_bimestral,
+CASE 
+   WHEN f1.fecha_lectura_ver IS NOT NULL THEN f1.lectura_verif
+   ELSE f1.lectura_actual - f1.lectura_ant
+END,
+f1.cons_activa_p2,
+f1.lectura_ant,
+CASE
+   WHEN f1.tipo_lectura = 1 THEN f1.lectura_prop
+   WHEN f1.tipo_lectura = 4 THEN f1.lectura_a_fact
+   WHEN f1.ind_verificacion='S' AND f1.tipo_lectura in (2,3) AND f1.fecha_lectura_ver IS NOT NULL THEN f1.lectura_verif
+   WHEN f1.ind_verificacion='S' AND f1.tipo_lectura = 2 AND f1.fecha_lectura_ver IS NULL THEN f1.lectura_actual
+   WHEN (f1.ind_verificacion !='S' or f1.ind_verificacion IS NULL) AND f1.tipo_lectura = 2 THEN f1.lectura_actual  
+   ELSE -1
+END lectura_activa,
+CASE
+   WHEN f1.tipo_lectura_reac = 1 THEN f1.lectura_prop_reac
+   WHEN f1.tipo_lectura_reac = 4 THEN f1.lectu_a_fact_reac
+   WHEN f1.ind_verificacion='S' AND f1.tipo_lectura_reac in (2,3) AND f1.fecha_lectura_ver IS NOT NULL THEN f1.lectura_verif_reac
+   WHEN f1.ind_verificacion='S' AND f1.tipo_lectura_reac = 2 AND f1.fecha_lectura_ver IS NULL THEN f1.lectu_actual_reac
+   WHEN (f1.ind_verificacion !='S' or f1.ind_verificacion IS NULL) AND f1.tipo_lectura_reac = 2 THEN f1.lectu_actual_reac 
+   ELSE -1
+END lectura_reactiva,
+f1.corr_facturacion,
+f1.tipo_lectura,
+f1.numero_medidor,
+f1.marca_medidor,
+f1.enteros,
+lpad('9',f1.enteros, '9')
+FROM fp_lectu f1
+WHERE f1.numero_cliente = 4222465
+AND f1.corr_facturacion = 95 
+*/   
 	/******** Sel Modelo Medidor *********/
 /*      
 	strcpy(sql, "SELECT me.mod_codigo, NVL(mo.tipo_medidor, 'A') FROM medidor me, modelo mo ");
@@ -864,19 +1096,19 @@ long	lFechaMoveIn;
 
     if ( SQLCODE != 0 ){
     	if(SQLCODE == 100){
-			printf("Cliente %ld sin lectura de ultimo correlativo (lecturas actuales)\n", lNroCliente);
+			/*printf("Cliente %ld sin lectura de ultimo correlativo (lecturas actuales)\n", lNroCliente);*/
 			return 0;
 		}else{
 			printf("Error al leer Lecturas (lecturas actuales) !!!\nProceso Abortado.\n");
 			return 0;	
 		}
     }			
-
+/*
 	if(regLec->tipo_lectura == 8 ){
 		printf("Cliente %ld sin lectura REAL en el ultimo correlativo (lecturas actuales)\n", lNroCliente);
 		return 0;		
 	}
-/*
+
 	while ((regLec->tipo_lectura == 8 || regLec->tipo_lectura == 5 || regLec->tipo_lectura == 6) && iVueltas < 3){
 		//lNroCliente=regLec->numero_cliente;
 		iCorrFactu=regLec->corr_facturacion - 1;
@@ -967,6 +1199,62 @@ long	lFechaMoveIn;
    }
                
 	return 1;	
+}
+
+short LeoLecturaPend(lNroCliente, iCorrFactu, regLec)
+$long 	lNroCliente;
+$int	iCorrFactu;
+$ClsLectura *regLec;
+{
+   char		sAuxiliar[21];
+   memset(sAuxiliar, '\0', sizeof(sAuxiliar));
+	
+	InicializaLectura(regLec);
+   
+    iCorrFactu = iCorrFactu-1;
+    
+	$EXECUTE selFPLectu INTO 
+      :regLec->numero_cliente,
+      :regLec->corr_facturacion,
+      :regLec->fecha_lectura,       
+      :regLec->tipo_lectura,
+      :regLec->lectura_facturac,
+      :regLec->numero_medidor,
+      :regLec->marca_medidor,
+      :regLec->clave_lectura,
+      :regLec->src_deta,
+      :regLec->src_code,
+      :regLec->tip_lectu,
+      :regLec->tip_anom,
+      :regLec->src_type,
+      :regLec->lectura_facturac_reac
+      USING :lNroCliente, :iCorrFactu;  
+
+    if ( SQLCODE != 0 ){
+    	if(SQLCODE == 100){
+			printf("Cliente %ld sin lectura Pendiente\n", lNroCliente);
+			return 0;
+		}else{
+			printf("Error al leer Lecturas Pendientes Cliente %ld.\n",lNroCliente);
+			return 0;	
+		}
+    }
+    
+    alltrim(regLec->clave_lectura, ' ');
+    alltrim(regLec->src_deta, ' ');
+    alltrim(regLec->src_code, ' ');
+    alltrim(regLec->tip_lectu, ' ');
+    alltrim(regLec->src_type, ' ');
+    alltrim(regLec->tip_anom, ' ');
+    
+    /* Marca Factura Migrada y refacturacion pendiente */
+	strcpy(regLec->flag_migrado, "N");
+	strcpy(regLec->flag_consumo_pendiente, "N");
+    /* Columnizo el tipo de lectura */
+    strcpy(sAuxiliar, strReplace(regLec->tip_lectu, "_", "|"));
+    strcpy(regLec->tip_lectu, sAuxiliar);    
+    
+	return 1;
 }
 
 short LeoLecturas(regLec, lFechaMoveIn)
@@ -1086,8 +1374,9 @@ $ClsLectura	*regLec;
 }
 
 
-void GenerarPlanoMisura(regLec)
+void GenerarPlanoMisura(regLec, iFlag)
 $ClsLectura		regLec;
+int				iFlag;
 {
 	char	sLinea[1000];
    int   iRcv;	
@@ -1154,10 +1443,10 @@ $ClsLectura		regLec;
    strcat(sLinea, "*|");
    
    /* 14 Energia Attiva Prelevata */
-   sprintf(sLinea, "%s%.0f|", sLinea, regLec.lectura_facturac);
+	sprintf(sLinea, "%s%.0f|", sLinea, regLec.lectura_facturac);
    
    /* 15 Energia Reattiva (Q1) */
-   if(!risnull(CDOUBLETYPE, (char *) &regLec.lectura_facturac_reac)){
+   if(!risnull(CDOUBLETYPE, (char *) &regLec.lectura_facturac_reac) && regLec.lectura_facturac_reac != -1){
       sprintf(sLinea, "%s%.0f|", sLinea, regLec.lectura_facturac_reac);
    }else{
       strcat(sLinea, "|");
@@ -1209,7 +1498,7 @@ $ClsLectura		regLec;
    sprintf(sLinea, "%s%.0f|", sLinea, regLec.lectura_facturac);
 
    /* 37 Energia Reattiva */
-   if(!risnull(CDOUBLETYPE, (char *) &regLec.lectura_facturac_reac)){
+   if(!risnull(CDOUBLETYPE, (char *) &regLec.lectura_facturac_reac) && regLec.lectura_facturac_reac != -1){
       sprintf(sLinea, "%s%.0f|", sLinea, regLec.lectura_facturac_reac);
    }else{
       strcat(sLinea, "|");
@@ -1231,52 +1520,62 @@ $ClsLectura		regLec;
 
 	strcat(sLinea, "\n");
 	
-   iRcv=fprintf(pFileMisura, sLinea);
+	if(iFlag==0){
+		iRcv=fprintf(pFileMisura, sLinea);
+	}else{
+		iRcv=fprintf(pFileMisuraPend, sLinea);		
+	}
+	
    if(iRcv<0){
-      printf("Error al grabar Misura\n");
+      printf("Error al grabar Misura. iFalg %d\n",iFlag);
       exit(1);
    }
 }
 
-void GenerarPlanoAdjunto(regLec)
+void GenerarPlanoAdjunto(regLec, iFlag)
 $ClsLectura		regLec;
+int				iFlag;
 {
 	char	sLinea[1000];
-   int   iRcv;	
-   char  sFecha[20];
-   
-	memset(sLinea, '\0', sizeof(sLinea));
-   memset(sFecha, '\0', sizeof(sFecha));
-   
-   rfmtdate(regLec.fecha_lectura, "dd/mm/yyyy", sFecha);
-	
+	int   iRcv;	
+	char  sFecha[20];
 
-   /* Eneltel */
-   sprintf(sLinea, "%0.9ld|", regLec.numero_cliente);
+	memset(sLinea, '\0', sizeof(sLinea));
+	memset(sFecha, '\0', sizeof(sFecha));
    
-   /* POD */
-   sprintf(sLinea, "%sAR103E%0.8ld|", sLinea, regLec.numero_cliente);
-   
-   /* Fecha lectura */
-   sprintf(sLinea, "%s%s|", sLinea, sFecha);
-   
-   /* Tipo lectura */
-   sprintf(sLinea, "%s%s|", sLinea, regLec.tip_lectu);
-   
-   /* Flag SAP */
-   sprintf(sLinea, "%s%s|", sLinea, regLec.flag_migrado);
-   
-   /* Energia Pendiente */
-   sprintf(sLinea, "%s%s|", sLinea, regLec.flag_consumo_pendiente);
+	rfmtdate(regLec.fecha_lectura, "dd/mm/yyyy", sFecha);
+
+
+	/* Eneltel */
+	sprintf(sLinea, "%0.9ld|", regLec.numero_cliente);
+
+	/* POD */
+	sprintf(sLinea, "%sAR103E%0.8ld|", sLinea, regLec.numero_cliente);
+
+	/* Fecha lectura */
+	sprintf(sLinea, "%s%s|", sLinea, sFecha);
+
+	/* Tipo lectura */
+	sprintf(sLinea, "%s%s|", sLinea, regLec.tip_lectu);
+
+	/* Flag SAP */
+	sprintf(sLinea, "%s%s|", sLinea, regLec.flag_migrado);
+
+	/* Energia Pendiente */
+	sprintf(sLinea, "%s%s|", sLinea, regLec.flag_consumo_pendiente);
 
 	strcat(sLinea, "\n");
-   	
-	iRcv=fprintf(pFileMisuraAdj, sLinea);
 
-   if(iRcv < 0){
-      printf("Error al escribir MisuraAdj\n");
-      exit(1);
-   }	
+	if(iFlag==0){
+		iRcv=fprintf(pFileMisuraAdj, sLinea);
+	}else{
+		iRcv=fprintf(pFileMisuraAdjPend, sLinea);
+	}
+
+	if(iRcv < 0){
+		printf("Error al escribir MisuraAdj. iFlag %d\n", iFlag);
+		exit(1);
+	}	
 }
 
 int getCorrelativoLectu(lNroCliente, iCorrFacturacion)

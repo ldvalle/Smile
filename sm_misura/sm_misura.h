@@ -41,23 +41,25 @@ short	AnalizarParametros(int, char **);
 void	MensajeParametros(void);
 short	AbreArchivos(int, int);
 short	AbreArchivosActual(int, int);
-void  CreaPrepare(void);
+void  	CreaPrepare(void);
 void 	FechaGeneracionFormateada( char *);
 void 	RutaArchivos( char*, char * );
 
-short LeoCliente( long *, long *, long *, int *, int *);
-short LeoLecturasAct(ClsLectura *, long);
-short LeoLecturas(ClsLectura *, long);
-void  InicializaLectura(ClsLectura *);
+short	LeoCliente( long *, long *, long *, int *, int *);
+short	LeoLecturasAct(long, int, ClsLectura *, long);
+short	LeoLecturaPend(long, int, ClsLectura *);
+short	LeoLecturas(ClsLectura *, long);
+void 	InicializaLectura(ClsLectura *);
 
-void	GenerarPlanoMisura(ClsLectura);
-void	GenerarPlanoAdjunto(ClsLectura);
+void	GenerarPlanoMisura(ClsLectura, int);
+void	GenerarPlanoAdjunto(ClsLectura, int);
 
+int		getCorrelativoLectu(long, int);
 char 	*strReplace(char *, char *, char *);
 char	*getEmplazaSAP(char*);
 char	*getEmplazaT23(char*);
 void	CerrarArchivos(void);
-void	MoverArchivos(void);
+void	MoverArchivos(int);
 
 /*
 short	EnviarMail( char *, char *);
