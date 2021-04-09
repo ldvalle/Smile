@@ -487,12 +487,12 @@ int   iIndex;
 
    FechaGeneracionFormateada(sFecha);
    
-	RutaArchivos( sPathSalida, "SAPISU" );
+	RutaArchivos( sPathSalida, "SMIGEN" );
 	alltrim(sPathSalida,' ');
 
-	RutaArchivos( sPathCopia, "SAPCPY" );
+	RutaArchivos( sPathCopia, "SMICPY" );
    alltrim(sPathCopia,' ');
-   strcat(sPathCopia, "SMILE/");
+   strcat(sPathCopia, "Misura/");
 
 	sprintf( sArchMisuraUnx  , "%sLEITURA_T1.unx", sPathSalida );
    sprintf( sArchMisuraAux  , "%sLEITURA_T1.aux", sPathSalida );
@@ -742,7 +742,7 @@ if(giTipoCorrida==1){
 			  sm_transforma t2, sm_transforma t3, OUTER sm_transforma t4, 
 			  sm_transforma t5
 		WHERE f1.numero_cliente = ?
-		AND f1.corr_facturacion = ?
+		AND (f1.corr_facturacion = ? OR f1.corr_fact_ant = ? )
 		AND t1.clave = 'SRCDETA'
 		AND t1.cod_mac_numerico = f1.tipo_lectura
 		AND t2.clave = 'SRCCODE'
@@ -1228,7 +1228,7 @@ $ClsLectura *regLec;
       :regLec->tip_anom,
       :regLec->src_type,
       :regLec->lectura_facturac_reac
-      USING :lNroCliente, :iCorrFactu;  
+      USING :lNroCliente, :iCorrFactu, :iCorrFactu;  
 
     if ( SQLCODE != 0 ){
     	if(SQLCODE == 100){
