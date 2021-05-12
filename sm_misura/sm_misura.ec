@@ -110,6 +110,7 @@ int		 iCantidadArchivos=0;
 long     iCantLecturasActuales=0;
 long	 iCantLecturasPendientes=0;
 $int	 iCorrFactuActual;
+$int	 iCorrFactuFutura;
 
 	if(! AnalizarParametros(argc, argv)){
 		exit(0);
@@ -152,8 +153,8 @@ $int	 iCorrFactuActual;
 		iIndexFile++;
 		iFilasFile=0;
 
-		$OPEN curClientes USING :iPlan;
-		/*$OPEN curClientes USING :iPlan, :iPlan, :lFecha4Y;*/
+		/*$OPEN curClientes USING :iPlan;*/
+		$OPEN curClientes USING :iPlan, :iPlan, :lFecha4Y;
 
 		rsetnull(CLONGTYPE, (char *) &(lNroCliente));
 		rsetnull(CLONGTYPE, (char *) &(lFechaPivote));
@@ -234,8 +235,8 @@ $int	 iCorrFactuActual;
 	   
 	   iFilasFile=0;
 	   
-	   $OPEN curClientes USING :iPlan;
-	   /*$OPEN curClientes USING :iPlan, :iPlan, :lFecha4Y;*/
+	   /*$OPEN curClientes USING :iPlan;*/
+	   $OPEN curClientes USING :iPlan, :iPlan, :lFecha4Y;
 
 		rsetnull(CLONGTYPE, (char *) &(lNroCliente));
 		rsetnull(CLONGTYPE, (char *) &(lFechaPivote));
@@ -247,6 +248,7 @@ $int	 iCorrFactuActual;
 	   while(LeoCliente(&lNroCliente, &lFechaPivote, &lFechaMoveIn, &iCorrFacturacion, &iEstadoCliente)){
 		  iCorrFactuActual=iCorrFacturacion;
 		  iCorrFacturacion=getCorrelativoLectu(lNroCliente, iCorrFacturacion);
+		  iCorrFactuFutura=iCorrFactuActual + 1;
 		  
 		  if(iCorrFacturacion >= 0){
 			$OPEN curLecturas USING :lNroCliente, :lFecha4Y, :iCorrFacturacion, :lNroCliente, :iCorrFactuActual;
@@ -404,17 +406,17 @@ int   iIndex;
 
 	FechaGeneracionFormateada(sFecha);
 
-	RutaArchivos( sPathSalida, "SAPISU" );
+	RutaArchivos( sPathSalida, "SMIGEN" );
 	alltrim(sPathSalida,' ');
 
-	RutaArchivos( sPathCopia, "SAPCPY" );
+	RutaArchivos( sPathCopia, "SMICPY" );
 	alltrim(sPathCopia,' ');
-	strcat(sPathCopia, "SMILE/");
+	strcat(sPathCopia, "Misura/");
 
 /*--------Misura Pendiente de facturar-------*/
-	sprintf( sArchMisuraPendUnx  , "%sMISURA_PENDIENTE_T1_.unx", sPathSalida );
-	sprintf( sArchMisuraPendAux  , "%sMISURA_PENDIENTE_T1.aux", sPathSalida );
-	sprintf( sArchMisuraPendDos  , "%sMISURA_PENDIENTE_T1_%s_%d_%d.txt", sPathSalida, sFecha, iPlan, iIndex);
+	sprintf( sArchMisuraPendUnx  , "%sLEITURA_PENDIENTE_T1_.unx", sPathSalida );
+	sprintf( sArchMisuraPendAux  , "%sLEITURA_PENDIENTE_T1.aux", sPathSalida );
+	sprintf( sArchMisuraPendDos  , "%sLEITURA_PENDIENTE_T1_%s_%d_%d.txt", sPathSalida, sFecha, iPlan, iIndex);
 
 /*--------Adjunto Misura Pendiente de facturar-------*/
 	sprintf( sArchMisuraAdjPendUnx  , "%sADJUNTO_MISURA_PENDIENTE_T1.unx", sPathSalida );
@@ -607,6 +609,7 @@ $char sAux[1000];
 
 	memset(sql, '\0', sizeof(sql));
 	memset(sAux, '\0', sizeof(sAux));
+	
 
 	/******** Fecha Actual Formateada ****************/
 	strcpy(sql, "SELECT TO_CHAR(TODAY, '%Y%m%d') FROM dual ");
@@ -638,7 +641,7 @@ if(giTipoCorrida==1){
 if(giTipoCorrida==1){
    strcat(sql, "AND m.numero_cliente = c.numero_cliente ");
 }   
-/*
+
 	strcat(sql, "UNION ");
 
 	strcat(sql, "SELECT c2.numero_cliente, NVL(s2.fecha_pivote, TODAY), NVL(s2.fecha_move_in, TODAY), c2.corr_facturacion, c2.estado_cliente ");
@@ -660,13 +663,13 @@ if(giTipoCorrida==1){
 if(giTipoCorrida==1){
    strcat(sql, "AND m2.numero_cliente = c2.numero_cliente ");
 }   
-*/   
+
 	$PREPARE selClientes FROM $sql;
 	
 	$DECLARE curClientes CURSOR WITH HOLD FOR selClientes;
 
 	/******** LECTURAS ACTUALES  ****************/
-   $PREPARE selLecturasAct FROM "SELECT h.numero_cliente, 
+   $PREPARE selLecturasAct FROM "SELECT FIRST 1 h.numero_cliente, 
       h.corr_facturacion, 
       h.fecha_lectura, 
       h.tipo_lectura, 
@@ -699,7 +702,8 @@ if(giTipoCorrida==1){
       AND t5.cod_mac_numerico = h.tipo_lectura      
       AND h2.numero_cliente = h.numero_cliente
       AND h2.corr_facturacion = h.corr_facturacion
-      AND h2.tipo_lectura = h.tipo_lectura ";
+      AND h2.tipo_lectura = h.tipo_lectura
+      AND h2.fecha_lectura = h.fecha_lectura ";
 /*      
       ORDER BY h.fecha_lectura, h.tipo_lectura ASC ";   
 	
@@ -827,6 +831,7 @@ if(giTipoCorrida==1){
       AND h2.numero_cliente = h.numero_cliente
       AND h2.corr_facturacion = h.corr_facturacion
       AND h2.tipo_lectura = h.tipo_lectura
+      AND h2.fecha_lectura = h.fecha_lectura
       UNION
 	  SELECT h.numero_cliente, 
       h.corr_facturacion, 
@@ -847,7 +852,7 @@ if(giTipoCorrida==1){
       sm_transforma t2, sm_transforma t3, OUTER sm_transforma t4, 
       sm_transforma t5, OUTER hislec_reac h2
       WHERE h.numero_cliente = ?
-      and h.corr_facturacion = ?
+      and h.corr_facturacion >= ?
       AND h.tipo_lectura IN (5, 6)
       AND t1.clave = 'SRCDETA'
       AND t1.cod_mac_numerico = h.tipo_lectura
@@ -861,7 +866,8 @@ if(giTipoCorrida==1){
       AND t5.cod_mac_numerico = h.tipo_lectura      
       AND h2.numero_cliente = h.numero_cliente
       AND h2.corr_facturacion = h.corr_facturacion
-      AND h2.tipo_lectura = h.tipo_lectura      
+      AND h2.tipo_lectura = h.tipo_lectura
+      AND h2.fecha_lectura = h.fecha_lectura
       ORDER BY 3, 4 ASC ";   
 	
 	$DECLARE curLecturas CURSOR WITH HOLD FOR selLecturas;
@@ -1248,7 +1254,7 @@ $ClsLectura *regLec;
     alltrim(regLec->tip_anom, ' ');
     
     /* Marca Factura Migrada y refacturacion pendiente */
-	strcpy(regLec->flag_migrado, "N");
+	strcpy(regLec->flag_migrado, "S");
 	strcpy(regLec->flag_consumo_pendiente, "N");
     /* Columnizo el tipo de lectura */
     strcpy(sAuxiliar, strReplace(regLec->tip_lectu, "_", "|"));

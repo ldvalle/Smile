@@ -102,7 +102,7 @@ void	MensajeParametros(void);
 short	AbreArchivos(int);
 void  CreaPrepare(void);
 void 	FechaGeneracionFormateada( char *);
-void 	RutaArchivos( char*, char * );
+char 	*RutaArchivos( char*, char * );
 long  getCorrelativo(char*);
 
 short LeoCliente(ClsCliente * );
