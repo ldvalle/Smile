@@ -353,7 +353,8 @@ $char sAux[1000];
 		m.estado, 
 		s.osm_status, 
 		ot_numero_cliente, 
-		s.osm_nro_orden
+		s.osm_nro_orden, 
+		TO_CHAR(h1.ots_fecha_proc, '%Y-%m%dT%H:%M%S.000Z')
 	FROM ot_mac om, ot_hiseven h1, xnear2:mensaje m, OUTER orden o, outer ot_sap_mac s
 	WHERE om.ot_fecha_est BETWEEN ? AND ?
 	AND h1.ots_nro_orden = om.ot_nro_orden
@@ -408,7 +409,13 @@ $char sAux[1000];
 		AND fecha_activacion <= TODAY
 		AND (fecha_desactivac > TODAY OR fecha_desactivac IS NULL ) ";
 
-
+	/****** Texton Segen ********/
+	$PREPARE selTexton FROM "SELECT pagina, texton FROM xnear2:pagina
+		WHERE mensaje = ?
+		AND servidor = 1
+		ORDER BY pagina ";
+			
+	$DECLARE curTexton CURSOR FOR selTexton;
 }
 
 void FechaGeneracionFormateada( Fecha )
@@ -457,6 +464,7 @@ $long iValor=0;
 short LeoOTS(reg)
 $ClsOT *reg;
 {
+	$ClsTexton regTex;
 	$char sTipoOt[7];
 	
 	InicializaOT(reg);
@@ -475,7 +483,8 @@ $ClsOT *reg;
 		:reg->estado_mensaje,
 		:reg->sap_status,
 		:reg->numero_cliente,
-		:reg->sap_nro_ot;
+		:reg->sap_nro_ot,
+		:fecha_evento_fmt;
 	
     if ( SQLCODE != 0 ){
     	if(SQLCODE == 100){
@@ -510,7 +519,20 @@ $ClsOT *reg;
    $EXECUTE selMotivoOt INTO :reg->descri_motivo USING :sTipoOt, :reg->ot_cod_motivo;
    
    alltrim(reg->descri_motivo, ' ');
+
           
+	$OPEN curTexton USING reg->nro_mensaje;
+	
+	while LeoTexton(&regTex){
+		if(regTex.iPag==1){
+			strcpy(reg->sTexton, regTex.sTexto);
+		}else{
+			sprintf(reg->sTexton, "%s%s", reg->sTexton, regTex.sTexto);
+		}
+	}
+	
+	$CLOSE curTexton;
+	
 	return 1;	
 }
 
@@ -532,8 +554,33 @@ $ClsOT	*reg;
    memset(reg->sap_status, '\0', sizeof(reg->sap_status));
    rsetnull(CLONGTYPE, (char *) &(reg->numero_cliente));
    memset(reg->sap_nro_ot, '\0', sizeof(reg->sap_nro_ot));
-   memset(reg->descri_motivo, '\0', sizeof(reg->descri_motivo));
+   memset(reg->fecha_evento_fmt, '\0', sizeof(reg->fecha_evento_fmt));
    
+   memset(reg->descri_motivo, '\0', sizeof(reg->descri_motivo));
+   memset(reg->sTexton, '\0', sizeof(reg->sTexton));
+   
+}
+
+short LeoTexton(reg)
+$ClsTexton *reg;
+{
+	
+	InicializaTexton(reg);
+	
+	$FETCH curTexton INTO :reg->iPag, :reg->sTexto;
+	
+	if (SQLCODE != 0 ){
+		return 0;
+	}
+	
+	return 1;
+}
+
+void InicializaTexton(reg)
+$ClsTexton *reg;
+{
+	rsetnull(CINTTYPE, (char *) &(reg->iPag));
+	memset(reg->sTexto, '\0', sizeof(reg->sTexto));
 }
 
 
@@ -565,7 +612,7 @@ $ClsConve		reg;
    sprintf(sLinea, "%s\"%s\";", sLinea, reg.descri_motivo);
    
    /* Descripcion */
-   strcat(sLinea, "\"\";");
+   sprintf(sLinea, "%s\"%s\";", sLinea, reg.sTexton);
    
    /* Estado */
    if(strcmp(reg.histo_status, "")!=0){
@@ -575,11 +622,10 @@ $ClsConve		reg;
    }
    
    /* Fecha Estado */
-   sprintf(sLinea, "%s\"%s\";", sLinea, reg.fecha_evento);
+   sprintf(sLinea, "%s\"%s\";", sLinea, reg.fecha_evento_fmt);
    
    /* Codigo ISO */
    strcat(sLinea, "\"ARS\";");
-	
 
 
 	strcat(sLinea, "\n");

@@ -354,7 +354,8 @@ ClsAgenda   reg;
 	sprintf(sLinea, "%ld|", reg.numero_cliente);
 	
 	/* STATO */
-	sprintf(sLinea, "%s%s|", sLinea, reg.cod_estado);
+	/*sprintf(sLinea, "%s%s|", sLinea, reg.cod_estado);*/
+	strcat(sLinea, "INS|");
 	
 	/* DT_MOD_STATO */
 	sprintf(sLinea, "%s%s|", sLinea, reg.fecha_inicio);
@@ -401,7 +402,11 @@ ClsAgenda   reg;
 	strcat(sLinea, "|");
 	
 	/* FLAG_DOLO */
-	sprintf(sLinea, "%s%s|", sLinea, reg.tipo_expediente);
+	if(regtipo_expediente[0]== 'C'){ 
+		strcat(sLinea, "Y|");
+	}else{
+		strcat(sLinea, "N|");
+	}
 	
 	/* TIPO_IRREGULARIDAD */
 	sprintf(sLinea, "%s%s|", sLinea, reg.anomalia)
@@ -423,7 +428,12 @@ ClsAgenda   reg;
 	/* HORAS_USO */
 	strcat(sLinea, "|");
 	/* FACTOR_CARGA */
-	strcat(sLinea, "|");
+	if(regtipo_expediente[0]== 'C'){ 
+		strcat(sLinea, "40|");
+	}else{
+		strcat(sLinea, "|");
+	}
+	
 	/* FACTOR_DEMANDA */
 	strcat(sLinea, "|");
 	/* FLAG_CARGA_DESVIADA_PARCIAL */

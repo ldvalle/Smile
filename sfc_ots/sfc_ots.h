@@ -30,8 +30,15 @@ $typedef struct{
 	char	sap_status[5];
 	long 	numero_cliente;
 	char	sap_nro_ot[13];
+	char	fecha_evento_fmt[25];
 	char	descri_motivo[51];
+	char	sTexton[10240];
 }ClsOT;
+
+$typedef struct{
+	int  	iPag;
+	char	sTexto[101];
+}ClsTexton;
 
 
 /* Prototipos de Funciones */
@@ -44,6 +51,9 @@ void 	RutaArchivos( char*, char * );
 
 short 	LeoOTS(ClsOT *);
 void  	InicializaOT(ClsOT *);
+
+short	LeoTexton(ClsTexton *);
+void  	InicializaTexton(ClsTexton *);
 
 short	GenerarPlano(FILE *, ClsOT);
 
