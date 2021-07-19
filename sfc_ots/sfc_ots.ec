@@ -102,16 +102,19 @@ $long lNroCliente;
 				AREA CURSOR PPAL
 	**********************************************/
 
-   $OPEN curOTS USING :gsFechaDesdeDT, :gsFechaHastaDT, :gsFechaDesdeDT, :gsFechaHastaDT, :gsFechaDesdeDT, :gsFechaHastaDT,DT :glFechaDesde, :glFechaHasta;
+   $OPEN curOTS USING :gsFechaDesdeDT, :gsFechaHastaDT, :gsFechaDesdeDT, :gsFechaHastaDT, :glFechaDesde, :glFechaHasta,:gsFechaDesdeDT, :gsFechaHastaDT;
 
    	while(LeoOTS(&regOT)){
+
    		if (!GenerarPlano(fp, regOT)){
+
             printf("Fallo GenearPlano\n");
    			exit(1);	
    		}
    		cantProcesada++;
    	}
-   	
+
+
    	$CLOSE curOTS;
       
 /*      
@@ -206,11 +209,10 @@ char	* argv[];
 }
 
 void MensajeParametros(void){
-		printf("Error en Parametros.\n");
-		printf("	<Base> = synergia.\n");
-		printf("	<Tipo Corrida> 0=total, 1=Reducida, 3=Delta.\n");
-      printf("	<Fecha Desde> = dd/mm/aaaa.\n");
-      printf("	<Fecha Hasta> = dd/mm/aaaa.\n");
+	printf("Error en Parametros.\n");
+	printf("	<Base> = synergia.\n");
+    printf("	<Fecha Desde> = dd/mm/aaaa.\n");
+    printf("	<Fecha Hasta> = dd/mm/aaaa.\n");
       
 }
 
@@ -238,7 +240,7 @@ short AbreArchivos()
 
 	sprintf( sArchivoUnx  , "%sT1_OTS.unx", sPathSalida );
    sprintf( sArchivoAux  , "%sT1_OTS.aux", sPathSalida );
-   sprintf( sArchivoDos  , "%senel_care_OTS_t1_%s_%s.csv", sPathSalida, gsDesdeFmt, gsHastaFmt);
+   sprintf( sArchivoDos  , "%senel_care_workorder_%s_%s.csv", sPathSalida, gsDesdeFmt, gsHastaFmt);
 
 	strcpy( sSoloArchivo, "T1_OTS.unx");
 
@@ -340,53 +342,56 @@ $char sAux[1000];
 
 
    /******** Cursor de OTs ****************/
-   $PREPARE selOTS FROM "SELECT DISTINCT om.ot_mensaje_xnear, 
-		om.ot_nro_orden, 
-		o.numero_orden, 
-		o.tipo_orden, 
-		o.tema, 
-		o.trabajo, 
-		o.ident_etapa etapa, 
-		h1.ots_status, 
-		h1.ots_fecha_proc, 
-		om.ot_motivo, 
-		m.estado, 
-		s.osm_status, 
-		ot_numero_cliente, 
-		s.osm_nro_orden, 
-		TO_CHAR(h1.ots_fecha_proc, '%Y-%m%dT%H:%M%S.000Z')
+	$PREPARE selOTS FROM "SELECT DISTINCT om.ot_mensaje_xnear,
+	om.ot_nro_orden,
+	o.numero_orden,
+	o.tipo_orden,
+	o.tema,
+	o.trabajo,
+	o.ident_etapa etapa,
+	h1.ots_status,
+	h1.ots_fecha_proc,
+	om.ot_motivo,
+	m.estado,
+	s.osm_status,
+	ot_numero_cliente,
+	s.osm_nro_orden,
+	TO_CHAR(h1.ots_fecha_proc, '%Y-%m-%dT%H:%M:%S.000Z')
 	FROM ot_mac om, ot_hiseven h1, xnear2:mensaje m, OUTER orden o, outer ot_sap_mac s
 	WHERE om.ot_fecha_est BETWEEN ? AND ?
 	AND h1.ots_nro_orden = om.ot_nro_orden
 	AND h1.ots_fecha_proc between ? and ?
-	AND m.mensaje = om.ot_mensaje_xnear 
+	AND m.mensaje = om.ot_mensaje_xnear
 	AND m.rol_creacion not in (SELECT DISTINCT trim(sr.rol) FROM sfc_roles sr)
 	AND o.mensaje_xnear = om.ot_mensaje_xnear
-	AND s.osm_nro_orden[5,12]  = om.ot_nro_orden
+	AND s.osm_nro_orden[5,12] = om.ot_nro_orden
+	AND s.osm_tipo_ifaz = 'N001'
 	UNION
-	SELECT DISTINCT otf.mensaje_xnear, 
-		otf.otf_nro_orden, 
-		o.numero_orden, 
-		o.tipo_orden, 
-		o.tema, 
-		o.trabajo, 
-		NVL(o.ident_etapa,'FI') etapa, 
-		h1.ots_status, 
-		h1.ots_fecha_proc, 
-		otf.cod_motivo, 
-		m.estado, 
-		s.osm_status, 
-		otf.numero_cliente, 
-		s.osm_nro_orden
+	SELECT DISTINCT otf.mensaje_xnear,
+	otf.otf_nro_orden,
+	o.numero_orden,
+	o.tipo_orden,
+	o.tema,
+	o.trabajo,
+	NVL(o.ident_etapa,'FI') etapa,
+	h1.ots_status,
+	h1.ots_fecha_proc,
+	otf.cod_motivo,
+	m.estado,
+	s.osm_status,
+	otf.numero_cliente,
+	s.osm_nro_orden,
+	TO_CHAR(h1.ots_fecha_proc, '%Y-%m-%dT%H:%M:%S.000Z')
 	FROM ot_final otf, ot_hiseven h1, xnear2:mensaje m, OUTER orden o, outer ot_sap_mac s
 	WHERE fecha_ot_final BETWEEN ? AND ?
 	AND h1.ots_nro_orden = otf.otf_nro_orden
 	AND h1.ots_fecha_proc BETWEEN ? AND ?
-	AND m.mensaje = otf.mensaje_xnear 
+	AND m.mensaje = otf.mensaje_xnear
 	and m.rol_creacion not in (SELECT DISTINCT trim(sr.rol) FROM sfc_roles sr)
 	AND o.mensaje_xnear = otf.mensaje_xnear
-	AND s.osm_nro_orden[5,12]  = otf.otf_nro_orden
-	ORDER BY 1, ots_fecha_proc ";
+	AND s.osm_nro_orden[5,12] = otf.otf_nro_orden
+	AND s.osm_tipo_ifaz = 'N001'
+	ORDER BY 1, 9 ";
 	
 	$DECLARE curOTS CURSOR WITH HOLD FOR selOTS;
 
@@ -403,11 +408,11 @@ $char sAux[1000];
 
 	/******** Descripcion de Motivos ****************/
 	$PREPARE selMotivoOt FROM "SELECT TRIM(descripcion) FROM tabla
-		WHERE nomtabla= ?
+		WHERE nomtabla = ?
 		AND sucursal = '0000'
 		AND codigo = ?
 		AND fecha_activacion <= TODAY
-		AND (fecha_desactivac > TODAY OR fecha_desactivac IS NULL ) ";
+		AND (fecha_desactivac > TODAY OR fecha_desactivac IS NULL) ";
 
 	/****** Texton Segen ********/
 	$PREPARE selTexton FROM "SELECT pagina, texton FROM xnear2:pagina
@@ -466,7 +471,7 @@ $ClsOT *reg;
 {
 	$ClsTexton regTex;
 	$char sTipoOt[7];
-	
+
 	InicializaOT(reg);
 
 	$FETCH curOTS INTO
@@ -484,7 +489,7 @@ $ClsOT *reg;
 		:reg->sap_status,
 		:reg->numero_cliente,
 		:reg->sap_nro_ot,
-		:fecha_evento_fmt;
+		:reg->fecha_evento_fmt;
 	
     if ( SQLCODE != 0 ){
     	if(SQLCODE == 100){
@@ -494,6 +499,7 @@ $ClsOT *reg;
 			exit(1);	
 		}
     }			
+
    
    alltrim(reg->nro_orden, ' ');
    alltrim(reg->tipo_orden, ' ');
@@ -515,22 +521,24 @@ $ClsOT *reg;
    }else if(strcmp(reg->tipo_orden, "RET")==0){
 	    strcpy(sTipoOt, "OTMORE");	   
    }
-    
+
    $EXECUTE selMotivoOt INTO :reg->descri_motivo USING :sTipoOt, :reg->ot_cod_motivo;
    
    alltrim(reg->descri_motivo, ' ');
 
+
           
-	$OPEN curTexton USING reg->nro_mensaje;
-	
-	while LeoTexton(&regTex){
+	$OPEN curTexton USING :reg->nro_mensaje;
+
+	while(LeoTexton(&regTex)){
+
 		if(regTex.iPag==1){
 			strcpy(reg->sTexton, regTex.sTexto);
 		}else{
 			sprintf(reg->sTexton, "%s%s", reg->sTexton, regTex.sTexto);
 		}
 	}
-	
+
 	$CLOSE curTexton;
 	
 	return 1;	
@@ -564,14 +572,29 @@ $ClsOT	*reg;
 short LeoTexton(reg)
 $ClsTexton *reg;
 {
+	$char sTexto[102];
+	memset(sTexto, '\0', sizeof(sTexto));
 	
 	InicializaTexton(reg);
 	
-	$FETCH curTexton INTO :reg->iPag, :reg->sTexto;
+	$FETCH curTexton INTO :reg->iPag, :sTexto;
 	
 	if (SQLCODE != 0 ){
 		return 0;
 	}
+
+	strcpy(sTexto, strReplace(sTexto, "þ", " "));
+	strcpy(sTexto, strReplace(sTexto, "\"", "´"));
+	strcpy(sTexto, strReplace(sTexto, ",", " "));
+	strcpy(sTexto, strReplace(sTexto, "\r", " "));
+	strcpy(sTexto, strReplace(sTexto, "\n", " "));
+
+	strcpy(sTexto, strReplace2(sTexto, 13, 32));
+	strcpy(sTexto, strReplace2(sTexto, 254, 32));
+	
+	alltrim(sTexto, ' ');
+	
+	strcpy(reg->sTexto, sTexto);
 	
 	return 1;
 }
@@ -585,10 +608,10 @@ $ClsTexton *reg;
 
 
 short GenerarPlano(fp, reg)
-FILE 				*fp;
-$ClsConve		reg;
+FILE 		*fp;
+$ClsOT		reg;
 {
-	char	sLinea[1000];	
+	char	sLinea[15000];	
 	int   iRcv;
    
 	memset(sLinea, '\0', sizeof(sLinea));
@@ -600,43 +623,47 @@ $ClsConve		reg;
    sprintf(sLinea, "%s\"%ldARG\";",sLinea, reg.numero_cliente);   
    
    /* External ID */
-   sprintf(sLinea, "\"%08ldWOARG\";", reg.nro_mensaje);
+   sprintf(sLinea, "%s\"%08ldWOARG\";", sLinea, reg.nro_mensaje);
    
    /* Order Number */
-   sprintf(sLinea, "\"%08ld\";", reg.nro_mensaje);
+   sprintf(sLinea, "%s\"%08ld\";", sLinea, reg.nro_mensaje);
    
    /* Rol */
    strcat(sLinea, "\"\";");
    
    /* Asunto */
    sprintf(sLinea, "%s\"%s\";", sLinea, reg.descri_motivo);
-   
+
    /* Descripcion */
    sprintf(sLinea, "%s\"%s\";", sLinea, reg.sTexton);
-   
+
    /* Estado */
-   if(strcmp(reg.histo_status, "")!=0){
+   if(strcmp(reg.sap_status, "")!=0){
 		sprintf(sLinea, "%s\"%s\";", sLinea, reg.sap_status);
    }else{
 		sprintf(sLinea, "%s\"%s\";", sLinea, reg.histo_status);
    }
-   
+
    /* Fecha Estado */
    sprintf(sLinea, "%s\"%s\";", sLinea, reg.fecha_evento_fmt);
-   
+
    /* Codigo ISO */
    strcat(sLinea, "\"ARS\";");
 
 
 	strcat(sLinea, "\n");
-	
+
+printf("segen [%ld] \n", reg.nro_mensaje);	
+fflush(stdin);	
+
 	iRcv=fprintf(fp, sLinea);
+
    if(iRcv<0){
       printf("Error al grabar OTs\n");
       exit(1);
    }
-   	
-
+   
+   fflush(fp);	
 	
 	return 1;
 }
@@ -716,37 +743,38 @@ $char	FechaActual[11];
 }
 */
 
-
 static char *strReplace(sCadena, cFind, cRemp)
-char *sCadena;
+char sCadena[1000];
 char cFind[2];
 char cRemp[2];
 {
-	char sNvaCadena[1000];
-	int lLargo;
-	int lPos;
 
-	memset(sNvaCadena, '\0', sizeof(sNvaCadena));
-	
-	lLargo=strlen(sCadena);
-
-    if (lLargo == 0)
-    	return sCadena;
-
-	for(lPos=0; lPos<lLargo; lPos++){
-
-       if (sCadena[lPos] != cFind[0]) {
-       	sNvaCadena[lPos]=sCadena[lPos];
-       }else{
-	       if(strcmp(cRemp, "")!=0){
-	       		sNvaCadena[lPos]=cRemp[0];  
-	       }else {
-	            sNvaCadena[lPos]=' ';   
-	       }
-       }
-	}
-
-	return sNvaCadena;
+    char *p = sCadena;
+    
+    while (*p != '\0') {
+        if (*p == cFind[0])
+            *p = cRemp[0];
+        p++;
+    }
+    
+    strcat(sCadena, "\0");
+    
+    return sCadena;
 }
 
+static char *strReplace2(sCadena, cFind, cRemp)
+char sCadena[1000];
+int cFind;
+int cRemp;
+{
+    char *p = sCadena;
+    
+    while (*p != '\0') {
+        if (*p == cFind)
+            *p = cRemp;
+        p++;
+    }
+    
+   return sCadena;
+}
 

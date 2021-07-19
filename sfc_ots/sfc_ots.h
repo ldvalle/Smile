@@ -30,7 +30,7 @@ $typedef struct{
 	char	sap_status[5];
 	long 	numero_cliente;
 	char	sap_nro_ot[13];
-	char	fecha_evento_fmt[25];
+	char	fecha_evento_fmt[30];
 	char	descri_motivo[51];
 	char	sTexton[10240];
 }ClsOT;
@@ -40,7 +40,6 @@ $typedef struct{
 	char	sTexto[101];
 }ClsTexton;
 
-
 /* Prototipos de Funciones */
 short	AnalizarParametros(int, char **);
 void	MensajeParametros(void);
@@ -48,18 +47,15 @@ short	AbreArchivos(void);
 void    CreaPrepare(void);
 void 	FechaGeneracionFormateada( char *);
 void 	RutaArchivos( char*, char * );
-
 short 	LeoOTS(ClsOT *);
 void  	InicializaOT(ClsOT *);
-
 short	LeoTexton(ClsTexton *);
 void  	InicializaTexton(ClsTexton *);
-
 short	GenerarPlano(FILE *, ClsOT);
-
-char 	*strReplace(char *, char *, char *);
+static char	*strReplace(char *, char *, char *);
 void	CerrarArchivos(void);
 void	FormateaArchivos(void);
+static  char *strReplace2(char *, int, int);
 
 /*
 short	EnviarMail( char *, char *);
