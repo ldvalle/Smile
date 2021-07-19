@@ -511,6 +511,7 @@ $ClsOT *reg;
    alltrim(reg->ot_cod_motivo, ' ');
    alltrim(reg->sap_status, ' ');
    alltrim(reg->sap_nro_ot, ' ');
+   alltrim(reg->fecha_evento_fmt, ' ');
    
    memset(sTipoOt, '\0', sizeof(sTipoOt));
    
