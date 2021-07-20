@@ -578,7 +578,8 @@ $char sAux[1000];
 		AND h.numero_cliente   = c.numero_cliente 
 		/*AND h.corr_facturacion = c.corr_facturacion - 1 */
 		AND (h.corr_facturacion = c.corr_facturacion - 1 OR h.corr_fact_ant = c.corr_facturacion -1 )
-		AND sc.cod_centro_op = h.sucursal 
+		AND sc.cod_centro_op = h.sucursal
+		AND NOT EXISTS (SELECT 1 FROM hisfac f WHERE f.numero_cliente = h.numero_cliente AND f.corr_facturacion = h.corr_facturacion +1) 
 /*		
 		AND h.numero_cliente = m.numero_cliente  
 		AND h.numero_medidor = m.numero_medidor  

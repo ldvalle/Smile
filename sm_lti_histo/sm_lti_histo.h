@@ -13,13 +13,13 @@ $include datetime.h;
 
 #define SYN_CLAVE "DD_NOVOUT"
 
-/* Estructuras ***/
+/*** Estructuras ***/
 $typedef struct{
    long  numero_cliente;
    int   corr_facturacion;
    char  tarifa[11];
    long  correlativo_ruta;
-   char  info_adic_lectura[25];
+   char  info_adic_lectura[61]; /* le dejo el nombre pero es cliente.obs_dir */ 
 }ClsCliente;
 
 $typedef struct{
@@ -64,7 +64,11 @@ $typedef struct{
     
    long     lFechaVentana;
    long     lFechaIniVentana;  
+	char	sSucursal[5];
 }ClsFactura;
+
+ClsFactura	tVecFacturas[15];
+int iCantFact; 
 
 $typedef struct{
    long     numero_cliente;
@@ -98,7 +102,7 @@ void	MensajeParametros(void);
 short	AbreArchivos(int);
 void  CreaPrepare(void);
 void 	FechaGeneracionFormateada( char *);
-void 	RutaArchivos( char*, char * );
+char 	*RutaArchivos( char*, char * );
 long  getCorrelativo(char*);
 
 short LeoCliente(ClsCliente * );
@@ -134,6 +138,9 @@ void  MueveArchivos(void);
 
 short	ClienteYaMigrado(long, long*, int*);
 short	RegistraCliente(long, long, long, int);
+void    CalcularConsumos1erTLI(ClsFactura *reg);
+void    ImprimirTLIs(ClsCliente regCliente);
+
 
 /*
 short	EnviarMail( char *, char *);
