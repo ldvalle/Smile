@@ -1,4 +1,4 @@
-/*********************************************************************************
+/***********************************************************************************
     Proyecto: Migracion al sistema SALES-FORCES
     Aplicacion: sfc_device
     
@@ -419,9 +419,9 @@ int   iIndex;
 	sprintf( sArchMisuraPendDos  , "%sLEITURA_PENDIENTE_T1_%s_%d_%d.txt", sPathSalida, sFecha, iPlan, iIndex);
 
 /*--------Adjunto Misura Pendiente de facturar-------*/
-	sprintf( sArchMisuraAdjPendUnx  , "%sADJUNTO_MISURA_PENDIENTE_T1.unx", sPathSalida );
-	sprintf( sArchMisuraAdjPendAux  , "%sADJUNTO_MISURA_PENDIENTE_T1.aux", sPathSalida );
-	sprintf( sArchMisuraAdjPendDos  , "%sADJUNTO_MISURA_PENDIENTE_T1_%s_%d_%d.txt", sPathSalida, sFecha, iPlan, iIndex);
+	sprintf( sArchMisuraAdjPendUnx  , "%sADJUNTO_LEITURA_PENDIENTE_T1.unx", sPathSalida );
+	sprintf( sArchMisuraAdjPendAux  , "%sADJUNTO_LEITURA_PENDIENTE_T1.aux", sPathSalida );
+	sprintf( sArchMisuraAdjPendDos  , "%sADJUNTO_LEITURA_PENDIENTE_T1_%s_%d_%d.txt", sPathSalida, sFecha, iPlan, iIndex);
 
 /*-------Misura--------*/
 	sprintf( sArchMisuraUnx  , "%sLEITURA_ACT_T1_.unx", sPathSalida );
@@ -1165,7 +1165,7 @@ long	lFechaMoveIn;
     alltrim(regLec->tip_anom, ' ');
     
     /* Marca Factura Migrada */
-    if(regLec->fecha_lectura >= lFechaMoveIn){
+    if(regLec->fecha_lectura > lFechaMoveIn){
 		strcpy(regLec->flag_migrado, "S");
 	}else{
 		strcpy(regLec->flag_migrado, "N");
@@ -1313,7 +1313,7 @@ long	lFechaMoveIn;
     alltrim(regLec->tip_anom, ' ');
     
     /* Marca Factura Migrada */
-    if(regLec->fecha_lectura >= lFechaMoveIn){
+    if(regLec->fecha_lectura > lFechaMoveIn){
 		strcpy(regLec->flag_migrado, "S");
 	}else{
 		strcpy(regLec->flag_migrado, "N");

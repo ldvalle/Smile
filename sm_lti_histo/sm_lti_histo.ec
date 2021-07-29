@@ -495,7 +495,6 @@ $char sAux[1000];
 		h.fecha_facturacion, 
 		h.numero_factura, 
 		l1.tipo_lectura, 
-		/*NVL(mo.tipo_medidor, 'A'), */
 		'000T1'|| lpad(h.sector,2,0) || sc.cod_ul_sap porcion, 
 		TRIM(sc.cod_ul_sap || lpad(h.sector , 2, 0) ||  lpad(h.zona,5,0)) unidad_lectura, 
 		h.coseno_phi/100, 
@@ -504,14 +503,12 @@ $char sAux[1000];
 		LPAD(h.zona, 5, 0), 
 		l1.numero_medidor, 
 		l1.marca_medidor, 
-		/*mo.mod_codigo, */
 		l1.constante, 
 		l1.lectura_facturac, 
 		l2.lectura_facturac, 
 		sc.cod_ul_sap, 
 		h.consumo_sum, h.sucursal, -1, -1 
 		FROM hisfac h, sap_regi_cliente rc , hislec l1, hislec l2, sucur_centro_op sc
-		/*, medidor m, modelo mo*/
 		WHERE h.numero_cliente = ?
 		AND h.numero_cliente  = rc.numero_cliente  
 		AND h.fecha_lectura   > rc.fecha_move_in  
@@ -526,13 +523,6 @@ $char sAux[1000];
 			AND l3.tipo_lectura IN (1,2,3,4,7)) 
 		AND l2.tipo_lectura IN (1,2,3,4,7)
 		AND sc.cod_centro_op = h.sucursal 
-/*		
-		AND m.med_numero = l1.numero_medidor 
-		AND m.mar_codigo = l1.marca_medidor 
-		AND mo.mar_codigo = m.mar_codigo
-		AND mo.mod_codigo = m.mod_codigo
-*/
-		
 		UNION
 		SELECT DISTINCT h.numero_cliente, 
 		h.corr_facturacion + 1, 
@@ -552,7 +542,6 @@ $char sAux[1000];
 			AND l.identif_agenda    = f.age_lectura)) - 5    fecha_generacion,
 		-1   numero_factura, 
 		h.tipo_lectura, 
-		/*NVL(h.tipo_medidor, 'A'), */
 		'000T1'|| lpad(h.sector,2,0) || sc.cod_ul_sap porcion, 
 		TRIM(sc.cod_ul_sap || lpad(h.sector , 2, 0) ||  lpad(h.zona,5,0)) unidad_lectura, 
 		h.coseno_phi/100, 
@@ -561,7 +550,6 @@ $char sAux[1000];
 		LPAD(h.zona, 5, 0), 
 		h.numero_medidor, 
 		h.marca_medidor, 
-		/*m.modelo_medidor, */
 		h.constante, 
 		h.lectura_ant, 
 		CASE WHEN (lectura_ant + (cons_activa_p1 + cons_activa_p1)/h.constante) >= POW(10, h.enteros) THEN   
@@ -572,20 +560,12 @@ $char sAux[1000];
 		NVL(cons_reac_p1, 0) + NVL(cons_reac_p2, 0), 
 		lectura_ant_reac 
 		FROM fp_lectu h, cliente c, sucur_centro_op sc
-		/*, medid m */
 		WHERE h.numero_cliente   = ?  
-		/*AND h.corr_fact_ant     IS NULL  */
 		AND h.numero_cliente   = c.numero_cliente 
-		/*AND h.corr_facturacion = c.corr_facturacion - 1 */
 		AND (h.corr_facturacion = c.corr_facturacion - 1 OR h.corr_fact_ant = c.corr_facturacion -1 )
 		AND sc.cod_centro_op = h.sucursal
-		AND NOT EXISTS (SELECT 1 FROM hisfac f WHERE f.numero_cliente = h.numero_cliente AND f.corr_facturacion = h.corr_facturacion +1) 
-/*		
-		AND h.numero_cliente = m.numero_cliente  
-		AND h.numero_medidor = m.numero_medidor  
-		AND h.marca_medidor  = m.marca_medidor     
-		AND m.estado = 'I'  
-*/
+		and NVL(H.fecha_lectura_ver, H.fecha_lectura) > ( select distinct case when a.tipo_lectura = 8 then a.fecha_lectura else NULL end end from hislec a 
+		where a.numero_cliente = h.numero_cliente and a.fecha_lectura = (select max(b.fecha_lectura) end from hislec b where b.numero_cliente = a.numero_cliente and b.tipo_lectura not in (5,6,7)) )
 		ORDER BY 2  ASC ";
 
    $DECLARE curFactura CURSOR WITH HOLD FOR selFactura;
