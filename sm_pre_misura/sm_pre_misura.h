@@ -1,5 +1,5 @@
-$ifndef SMMISURA_H;
-$define SMMISURA_H;
+$ifndef SMPREMISURA_H;
+$define SMPREMISURA_H;
 
 #include "ustring.h"
 #include "macmath.h"

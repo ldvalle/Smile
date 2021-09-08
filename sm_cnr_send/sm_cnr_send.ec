@@ -14,7 +14,7 @@ $include "sm_cnr_send.h";
 FILE  	*fpUnx;
 char	sArchivoUnx[100];
 char	sSoloArchivoUnx[100];
-char  	sArchivoUnx2[100];
+char  	sArchivoDos[100];
 
 char	sPathSalida[100];
 char	sPathCopia[100];
@@ -24,8 +24,8 @@ char	sMensMail[1024];
 
 /* Variables Globales Host */
 $dtime_t    gtInicioCorrida;
-$long		gFechaDesde;
-$long		gFechaHasta;
+$long 	glFechaDesde;
+$long 	glFechaHasta;
 
 
 $WHENEVER ERROR CALL SqlException;
@@ -35,6 +35,7 @@ void main( int argc, char **argv )
 $char 	nombreBase[20];
 time_t 	hora;
 $ClsCNR  regCNR;
+long 	iCantCnr;
 
 	if(! AnalizarParametros(argc, argv)){
 		exit(0);
@@ -64,22 +65,25 @@ $ClsCNR  regCNR;
 	/*********************************************
 				AREA CURSOR PPAL
 	**********************************************/
+   iCantCnr = 0;
    
-   
+ printf("punto 1\n");
 	if(!AbreArchivos()){
 		exit(1);	
 	}
-	
-	$OPEN curCNR USING :gFechaDesde, :gFechaHasta;
+printf("punto 2\n");	
+	$OPEN curCNR USING :glFechaDesde, :glFechaHasta;
 	
 	while(LeoCNR(&regCNR)){
+printf("punto 3\n");		
 	  GenerarPlanos(fpUnx, regCNR);
+	  iCantCnr++;
 	}
-
+printf("punto 4\n");
 	$CLOSE curCNR;	
 
 	CerrarArchivos();
-
+printf("punto 5\n");
 	$CLOSE DATABASE;
 
 	$DISCONNECT CURRENT;
@@ -89,11 +93,11 @@ $ClsCNR  regCNR;
 	********************************************* */
    
    MueveArchivos();
-
+printf("punto 6\n");
 	printf("==============================================\n");
 	printf("SMILE - Envio de CNRs\n");
 	printf("==============================================\n");
-	printf("Proceso Concluido.\n");
+	printf("Cantidad de Expedientes enviados: %ld\n", iCantCnr);
 	printf("==============================================\n");
 	printf("\nHora antes de comenzar proceso : %s\n", ctime(&hora));						
 
@@ -123,6 +127,9 @@ char	* argv[];
 	strcpy(sFechaDesde, argv[2]); 
 	strcpy(sFechaHasta, argv[3]);
 	
+	rdefmtdate(&glFechaDesde, "dd/mm/yyyy", sFechaDesde); 
+	rdefmtdate(&glFechaHasta, "dd/mm/yyyy", sFechaHasta); 
+	
 	
 	return 1;
 }
@@ -142,7 +149,7 @@ short AbreArchivos()
    memset(sTitulo,'\0',sizeof(sTitulo));
 	memset(sArchivoUnx,'\0',sizeof(sArchivoUnx));
 	memset(sSoloArchivoUnx,'\0',sizeof(sSoloArchivoUnx));
-   memset(sArchivoUnx2,'\0',sizeof(sArchivoUnx2));
+   memset(sArchivoDos,'\0',sizeof(sArchivoDos));
    
    FechaGeneracionFormateada(FechaGeneracion);
 
@@ -158,6 +165,7 @@ short AbreArchivos()
    
 	sprintf( sArchivoUnx  , "%sT1_cnr_send.unx", sPathSalida );
 	strcpy( sSoloArchivoUnx, "T1_cnr_send.unx");
+	sprintf( sArchivoDos  , "%sT1_cnr_send_%s.txt", sPathSalida, FechaGeneracion);
    
 	fpUnx=fopen( sArchivoUnx, "w" );
 	if( !fpUnx ){
@@ -188,14 +196,14 @@ int	iRcv;
 	memset(sCommand, '\0', sizeof(sCommand));
 
    /*sprintf(sCommand, "iconv -f windows-1252 -t UTF-8 %s > %s ", sArchivoUnx, sArchivoUnx2);*/
-   sprintf(sCommand, "iconv -f ISO8859-1 -t UTF-8 %s > %s ", sArchivoUnx, sArchivoUnx2);
+   sprintf(sCommand, "iconv -f ISO8859-1 -t UTF-8 %s > %s ", sArchivoUnx, sArchivoDos);
    iRcv=system(sCommand);
 
 
-	sprintf(sCommand, "chmod 755 %s", sArchivoUnx2);
+	sprintf(sCommand, "chmod 755 %s", sArchivoDos);
 	iRcv=system(sCommand);
 	
-	sprintf(sCommand, "mv %s %s", sArchivoUnx2, sPathCopia);
+	sprintf(sCommand, "mv %s %s", sArchivoDos, sPathCopia);
 	iRcv=system(sCommand);		
 /*
    if(iRcv == 0){
@@ -238,26 +246,46 @@ $char sAux[1000];
 	/******** Fecha Actual  ****************/
 	strcpy(sql, "SELECT TO_CHAR(TODAY, '%d/%m/%Y') FROM dual ");
 	
-	$PREPARE selFechaActual FROM $sql;	
+	$PREPARE selFechaActual FROM $sql;
+	
+   /******** Cursor CNR  ****************/
+	strcpy(sql, "SELECT cn.numero_cliente, ");
+	strcat(sql, "cn.cod_estado, ");
+	strcat(sql, "TO_CHAR(cn.fecha_inicio, '%Y-%m-%d 00:00:00'), ");
+	strcat(sql, "cn.sucursal || LPAD(cn.nro_expediente, 10, '0') id_expe, ");
+	strcat(sql, "TO_CHAR(i.fecha_inspeccion, '%Y-%m-%d %H:%M:%S'), ");
+	strcat(sql, "cn.tipo_expediente, ");
+	strcat(sql, "TRIM(cn.cod_anomalia), ");
+	strcat(sql, "TRIM(ac.descripcion1), ");
+	strcat(sql, "TRIM(ac.categoria), ");
+	strcat(sql, "ac.precedencia, ");
+	strcat(sql, "TRIM(ac.descripcion2), ");
+	strcat(sql, "s.mot_denuncia, ");
+	strcat(sql, "DATE(i.fecha_inspeccion) ");
+	strcat(sql, "FROM cnr_new cn, inspecc:in_inspeccion i, inspecc:in_solicitud s, anomalias_cnr ac ");
+	strcat(sql, "WHERE cn.fecha_inicio BETWEEN ? AND ? ");
+	/*strcat(sql, "AND cn.cod_estado IN ('01', '02', '03') ");*/
+	strcat(sql, "AND cn.cod_estado IN ('01') ");
+	strcat(sql, "AND i.nro_solicitud = cn.in_solicitud_ap ");
+	strcat(sql, "AND s.nro_solicitud = cn.in_solicitud_ap ");
+	strcat(sql, "AND ac.codigo2 = cn.cod_anomalia ");
+	strcat(sql, "AND ac.categoria IS NOT NULL ");
 
-   /* Cursor CNR */
-   
-   $PREPARE selCNR FROM "SELECT cn.numero_cliente,
-	cn.cod_estado,
-	TO_CHAR(cn.fecha_inicio, '%Y-%m-%d 00:00:00'),
-	cn.sucursal || LPAD(cn.nro_expediente, 10, '0') id_expe,
-	TO_CHAR(i.fecha_inspeccion, '%Y-%m-%d %H:%M:%S'),
-	cn.tipo_expediente,
-	TRIM(cn.cod_anomalia) || '-' || TRIM(ac.descripcion)
-	FROM cnr_new cn, OUTER inspecc:in_inspeccion i, OUTER inspecc:in_anom_comercial ac
-	WHERE cn.fecha_inicio BETWEEN ? AND ?
-	AND cn.cod_estado IN ('01', '02', '03')
-	AND i.nro_solicitud = cn.in_solicitud_ap
-	AND ac.codigo = cn.cod_anomalia ";
-   
-   $DECLARE curCNR CURSOR FOR selCNR;   
-      
-   
+	$PREPARE selCNR FROM $sql;
+
+	$DECLARE curCNR CURSOR FOR selCNR;   
+
+	/******** Fecha Normalizacion  ****************/
+	strcpy(sql, "SELECT MIN(o.fecha_ejecucion) FROM ot_final o, ot_motivos_cnr m ");
+	strcat(sql, "WHERE o.numero_cliente = ? ");
+	strcat(sql, "AND o.fecha_creacion >= ? ");
+	strcat(sql, "AND o.cod_motivo = m.codigo ");
+	strcat(sql, "AND m.fecha_alta <= o.fecha_ejecucion ");
+	strcat(sql, "AND (m.fecha_baja IS NULL OR m.fecha_baja > o.fecha_ejecucion) ");
+	
+	$PREPARE selOT FROM $sql;
+
+
 	/******** Select Path de Archivos ****************/
 	strcpy(sql, "SELECT valor_alf ");
 	strcat(sql, "FROM tabla ");
@@ -268,7 +296,17 @@ $char sAux[1000];
 	strcat(sql, "AND ( fecha_desactivac >= TODAY OR fecha_desactivac IS NULL ) ");
 
 	$PREPARE selRutaPlanos FROM $sql;
-   
+	
+	/** Ultima Factura CNR **/
+	strcpy(sql, "SELECT TO_CHAR(f1.fecha_fact_desde, '%d/%m/%Y'), TO_CHAR(f1.fecha_fact_hasta, '%d/%m/%Y') ");
+	strcat(sql, "	FROM cnr_factura f1 ");
+	strcat(sql, "	WHERE f1.numero_cliente = ? ");
+	strcat(sql, "	AND f1.cod_estado != 'A' ");
+	strcat(sql, "	AND f1.fecha_emision = (SELECT MAX(f2.fecha_emision) FROM cnr_factura f2 ");
+	strcat(sql, "	   WHERE f2.numero_cliente = f1.numero_cliente ");
+	strcat(sql, "	   AND f2.cod_estado != 'A')  ");
+      
+    $PREPARE selUltimaFactura FROM $sql; 
 }
 
 void FechaGeneracionFormateada( Fecha )
@@ -300,7 +338,9 @@ $char clave[7];
 short LeoCNR(reg)
 $ClsCNR *reg;
 {
-   $long lFechaSiguiente;
+   $long lFechaOT;
+   
+   rsetnull(CLONGTYPE, (char *) &(lFechaOT));
    
    InicializaCNR(reg);
 
@@ -310,20 +350,53 @@ $ClsCNR *reg;
 		:reg->fecha_inicio,
 		:reg->id_expediente,
 		:reg->fecha_inspeccion,
-		:reg->tipo_expediente
-		:reg->anomalia;
+		:reg->tipo_expediente,
+		:reg->cod_anomalia,
+		:reg->desc_anomalia,
+		:reg->categoria,
+		:reg->precedencia,
+		:reg->desc_categoria,
+		:reg->mot_denuncia_inspe,
+		:reg->lFechaInspeccion;
+		
 
-  if ( SQLCODE != 0 ){
-    if(SQLCODE == 100){
-      return 0;
-    }else{
-      printf("Error al leer Cursor de CNRS !!!\nProceso Abortado.\n");
-      exit(1);	
-    }
-  }			
 
-	alltrim(reg->anomalia, ' ');
-      
+	if ( SQLCODE != 0 ){
+		if(SQLCODE == 100){
+		  return 0;
+		}else{
+		  printf("Error al leer Cursor de CNRS !!!\nProceso Abortado.\n");
+		  exit(1);	
+		}
+	}
+
+	alltrim(reg->cod_anomalia, ' ');
+	alltrim(reg->desc_anomalia, ' ');
+	alltrim(reg->categoria, ' ');
+	alltrim(reg->desc_categoria, ' ');
+	alltrim(reg->mot_denuncia_inspe, ' ');
+
+	/* Buscar la OT */
+    $EXECUTE selOT INTO :lFechaOT USING :reg->numero_cliente, :reg->lFechaInspeccion;
+    
+	if ( SQLCODE != 0 ){
+		if(SQLCODE != 100){
+		  printf("Error al buscar fecha de Normalizacion\nProceso Abortado.\n");
+		  exit(1);	
+		}
+	}else{
+		rfmtdate(lFechaOT, "dd/mm/yyyy", reg->sFechaNormalizacion);
+	}
+    
+    
+    /* Buscar Ultima Factura */
+    
+    $EXECUTE selUltimaFactura INTO :reg->sFechaInicioPeriodoCnrFacturado, :reg->sFechaFinPeriodoCnrFacturado
+		USING :reg->numero_cliente;
+		
+	alltrim(reg->sFechaInicioPeriodoCnrFacturado, ' ');
+	alltrim(reg->sFechaFinPeriodoCnrFacturado, ' ');
+	
    /*rfmtdate(lFechaSiguiente, "dd/mm/yyyy", reg->dataFacturacion); // long to char */
 
 	return 1;	
@@ -332,23 +405,35 @@ $ClsCNR *reg;
 void InicializaCNR(reg)
 $ClsCNR *reg;
 {
-   rsetnull(CLONGTYPE, (char *) &(reg->numero_cliente));
-   memset(reg->cod_estado, '\0', sizeof(reg->cod_estado));
-   memset(reg->fecha_inicio, '\0', sizeof(reg->fecha_inicio));
-   memset(reg->id_expediente, '\0', sizeof(reg->id_expediente));
-   memset(reg->fecha_inspeccion, '\0', sizeof(reg->fecha_inspeccion));
-   memset(reg->tipo_expediente, '\0', sizeof(reg->tipo_expediente));
-   memset(reg->anomalia, '\0', sizeof(reg->anomalia));
+	rsetnull(CLONGTYPE, (char *) &(reg->numero_cliente));
+	memset(reg->cod_estado, '\0', sizeof(reg->cod_estado));
+	memset(reg->fecha_inicio, '\0', sizeof(reg->fecha_inicio));
+	memset(reg->id_expediente, '\0', sizeof(reg->id_expediente));
+	memset(reg->fecha_inspeccion, '\0', sizeof(reg->fecha_inspeccion));
+	memset(reg->tipo_expediente, '\0', sizeof(reg->tipo_expediente));
+	memset(reg->cod_anomalia, '\0', sizeof(reg->cod_anomalia));
+	memset(reg->desc_anomalia, '\0', sizeof(reg->desc_anomalia));
+	memset(reg->categoria, '\0', sizeof(reg->categoria));
+	rsetnull(CINTTYPE, (char *) &(reg->precedencia));
+	memset(reg->desc_categoria, '\0', sizeof(reg->desc_categoria));
+	memset(reg->mot_denuncia_inspe, '\0', sizeof(reg->mot_denuncia_inspe));
+	rsetnull(CLONGTYPE, (char *) &(reg->lFechaInspeccion));
+	memset(reg->sFechaNormalizacion, '\0', sizeof(reg->sFechaNormalizacion));
+
+	memset(reg->sFechaInicioPeriodoCnrFacturado, '\0', sizeof(reg->sFechaInicioPeriodoCnrFacturado));
+	memset(reg->sFechaFinPeriodoCnrFacturado, '\0', sizeof(reg->sFechaFinPeriodoCnrFacturado));
+   
 }
 
 void GenerarPlanos(fpSalida, reg)
-FILE        *fpSalida;
-ClsAgenda   reg;
+FILE     *fpSalida;
+ClsCNR   reg;
 {
 	char	sLinea[1000];
 	int   iRcv;
 
 	memset(sLinea, '\0', sizeof(sLinea));
+	alltrim(reg.sFechaNormalizacion, ' ');
 
 	/* ENELTEL */
 	sprintf(sLinea, "%ld|", reg.numero_cliente);
@@ -367,7 +452,7 @@ ClsAgenda   reg;
 	sprintf(sLinea, "%s%s|", sLinea, reg.id_expediente);
 	
 	/* SYN_SELECTION_TYPE */
-	sprintf(sLinea, "%s%s|", sLinea, reg.id_expediente);
+	strcat(sLinea, "|");
 	
 	/* SYN_EMITING_AREA */
 	strcat(sLinea, "|");
@@ -399,22 +484,32 @@ ClsAgenda   reg;
 	sprintf(sLinea, "%s%s|", sLinea, reg.fecha_inspeccion);
 	
 	/* FECHA_NORMALIZACION */
-	strcat(sLinea, "|");
-	
-	/* FLAG_DOLO */
-	if(regtipo_expediente[0]== 'C'){ 
-		strcat(sLinea, "Y|");
+	if(strcmp(reg.sFechaNormalizacion,"")!=0){
+		sprintf(sLinea, "%s%s|", sLinea, reg.sFechaNormalizacion);
 	}else{
-		strcat(sLinea, "N|");
+		strcat(sLinea, "|");
 	}
 	
+	/* FLAG_DOLO */
+	sprintf(sLinea, "%s%d|", sLinea, reg.precedencia);
+	
 	/* TIPO_IRREGULARIDAD */
-	sprintf(sLinea, "%s%s|", sLinea, reg.anomalia)
+	sprintf(sLinea, "%s%s|", sLinea, reg.cod_anomalia);
 	
 	/* CNR_ANTERIOR_FECHA_INICIO */
-	strcat(sLinea, "|");
+	if(strcmp(reg.sFechaInicioPeriodoCnrFacturado, "")!=0){
+		sprintf(sLinea, "%s%s|", sLinea, reg.sFechaInicioPeriodoCnrFacturado);
+	}else{
+		strcat(sLinea, "|");
+	}
+	
 	/* CNR_ANTERIOR_FECHA_FIN */
-	strcat(sLinea, "|");
+	if(strcmp(reg.sFechaFinPeriodoCnrFacturado, "")!=0){
+		sprintf(sLinea, "%s%s|", sLinea, reg.sFechaFinPeriodoCnrFacturado);
+	}else{
+		strcat(sLinea, "|");
+	}
+
 	/* COEFICIENTE_DE_CORRECCION */
 	strcat(sLinea, "|");
 	/* VALOR_FISCAL */
@@ -428,7 +523,7 @@ ClsAgenda   reg;
 	/* HORAS_USO */
 	strcat(sLinea, "|");
 	/* FACTOR_CARGA */
-	if(regtipo_expediente[0]== 'C'){ 
+	if(strcmp(reg.categoria, "ANV")==0){ 
 		strcat(sLinea, "40|");
 	}else{
 		strcat(sLinea, "|");

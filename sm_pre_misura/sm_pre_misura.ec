@@ -21,7 +21,7 @@
 #include <time.h>
 #include <synmail.h>
 
-$include "sm_misura.h";
+$include "sm_pre_misura.h";
 
 /* Variables Globales */
 int   giTipoCorrida;
@@ -112,6 +112,8 @@ long	 iCantLecturasPendientes=0;
 $int	 iCorrFactuActual;
 $int	 iCorrFactuFutura;
 $long 	 lFechaBaja;
+$long 	 lFechaHasta;
+char	sFechaHasta[11];
 
 	if(! AnalizarParametros(argc, argv)){
 		exit(0);
@@ -130,6 +132,10 @@ $long 	 lFechaBaja;
 	$SET LOCK MODE TO WAIT 600;
 	$SET ISOLATION TO DIRTY READ;
 	
+	strcpy(sFechaHasta, "29/02/2020");
+	rsetnull(CLONGTYPE, (char *) &(lFechaHasta));
+	rdefmtdate(&lFechaHasta, "dd/mm/yyyy", sFechaHasta);
+	
    CreaPrepare();
 
 	/* ********************************************
@@ -144,7 +150,8 @@ $long 	 lFechaBaja;
 	
 	/*********************************************
 				AREA CURSOR ACTUAL
-	**********************************************/	
+	**********************************************/
+/*
 	iIndexFile=1;
 	for(iPlan=41; iPlan <= 80; iPlan++){
 		if(!AbreArchivosActual(iPlan, iIndexFile)){
@@ -154,7 +161,7 @@ $long 	 lFechaBaja;
 		iIndexFile++;
 		iFilasFile=0;
 
-		/*$OPEN curClientes USING :iPlan;*/
+		//$OPEN curClientes USING :iPlan;
 		$OPEN curClientes USING :iPlan, :iPlan, :lFecha4Y;
 
 		rsetnull(CLONGTYPE, (char *) &(lNroCliente));
@@ -167,7 +174,7 @@ $long 	 lFechaBaja;
 		
 		while(LeoCliente(&lNroCliente, &lFechaPivote, &lFechaMoveIn, &iCorrFacturacion, &iEstadoCliente, &lFechaBaja)){
 
-			/*$OPEN curLecturasAct USING :lNroCliente, :iCorrFacturacion;*/
+			//$OPEN curLecturasAct USING :lNroCliente, :iCorrFacturacion;
 
 			if(LeoLecturasAct(lNroCliente, iCorrFacturacion, &regLectura, lFechaMoveIn)){
 				
@@ -192,7 +199,7 @@ $long 	 lFechaBaja;
 					iCantLecturasActuales++;
 				}
 			}
-			/*$CLOSE curLecturasAct;*/
+			//$CLOSE curLecturasAct;
 			cantProcesada++;
 		  
 			if(iFilasFile > 500000){
@@ -220,7 +227,7 @@ $long 	 lFechaBaja;
 		iIndexFile=1;
 				
 	}  
-	
+*/	
 	
 	/*********************************************
 				AREA CURSOR HISTORICO
@@ -254,7 +261,7 @@ $long 	 lFechaBaja;
 		  iCorrFactuFutura=iCorrFactuActual + 1;
 		  
 		  if(iCorrFacturacion >= 0){
-			$OPEN curLecturas USING :lNroCliente, :lFecha4Y, :iCorrFacturacion, :lNroCliente, :iCorrFactuActual;
+			$OPEN curLecturas USING :lNroCliente, :glFechaDesde, :glFechaHasta;
 	   
 			while(LeoLecturas(&regLectura, lFechaMoveIn)){
 				GenerarPlanoMisura(regLectura, 0, iEstadoCliente, lFechaBaja);
@@ -370,7 +377,7 @@ void MensajeParametros(void){
 	printf("	<Base> = synergia.\n");
 	printf("	<Tipo Corrida> 0=Normal, 1=Reducida, 3=Delta.\n");
 	printf("	<Fecha Desde (Obligatoria)> dd/mm/aaaa.\n");
-	printf("	<Fecha Hasta (Opcional)> dd/mm/aaaa.\n");
+	printf("	<Fecha Hasta (Obligatorio)> dd/mm/aaaa.\n");
       
 }
 
@@ -501,11 +508,11 @@ int   iIndex;
 
 	sprintf( sArchMisuraUnx  , "%sLEITURA_T1.unx", sPathSalida );
    sprintf( sArchMisuraAux  , "%sLEITURA_T1.aux", sPathSalida );
-   sprintf( sArchMisuraDos  , "%sLEITURA_T1_%s_%d_%d.txt", sPathSalida, sFecha, iPlan, iIndex);
+   sprintf( sArchMisuraDos  , "%spreLEITURA_T1_%s_%d_%d.txt", sPathSalida, sFecha, iPlan, iIndex);
 
 	sprintf( sArchMisuraAdjUnx  , "%sADJUNTO_LEITURA_T1.unx", sPathSalida );
    sprintf( sArchMisuraAdjAux  , "%sADJUNTO_LEITURA_T1.aux", sPathSalida );
-   sprintf( sArchMisuraAdjDos  , "%sADJUNTO_LEITURA_T1_%s_%d_%d.txt", sPathSalida, sFecha, iPlan, iIndex);
+   sprintf( sArchMisuraAdjDos  , "%spreADJUNTO_LEITURA_T1_%s_%d_%d.txt", sPathSalida, sFecha, iPlan, iIndex);
 
 
 	pFileMisura=fopen( sArchMisuraUnx, "w" );
@@ -628,8 +635,8 @@ $char sAux[1000];
    $PREPARE selFechaInicio FROM "SELECT TODAY - 1460 FROM dual ";
    
 	/******** Cursor CLIENTES  ****************/	
-	strcpy(sql, "SELECT c.numero_cliente, NVL(s.fecha_pivote, TODAY), NVL(s.fecha_move_in, TODAY), c.corr_facturacion, c.estado_cliente ");
-	strcat(sql, "FROM cliente c, OUTER sap_regi_cliente s ");
+	strcpy(sql, "SELECT c.numero_cliente, TODAY, (TODAY-420), c.corr_facturacion, c.estado_cliente ");
+	strcat(sql, "FROM cliente c ");
 if(giTipoCorrida==1){
    strcat(sql, ", sm_universo m ");
 }   
@@ -640,15 +647,14 @@ if(giTipoCorrida==1){
 	strcat(sql, "WHERE cm.numero_cliente = c.numero_cliente ");
 	strcat(sql, "AND cm.fecha_activacion < TODAY ");
 	strcat(sql, "AND (cm.fecha_desactiva IS NULL OR cm.fecha_desactiva > TODAY)) ");	
-   strcat(sql, "AND s.numero_cliente = c.numero_cliente ");
 if(giTipoCorrida==1){
    strcat(sql, "AND m.numero_cliente = c.numero_cliente ");
 }   
 
 	strcat(sql, "UNION ");
 
-	strcat(sql, "SELECT c2.numero_cliente, NVL(s2.fecha_pivote, TODAY), NVL(s2.fecha_move_in, TODAY), c2.corr_facturacion, c2.estado_cliente ");
-	strcat(sql, "FROM cliente c2, bal_cliente b, OUTER sap_regi_cliente s2 ");
+	strcat(sql, "SELECT c2.numero_cliente, TODAY, (TODAY - 420), c2.corr_facturacion, c2.estado_cliente ");
+	strcat(sql, "FROM cliente c2, bal_cliente b ");
 if(giTipoCorrida==1){
    strcat(sql, ", sm_universo m2 ");
 }   
@@ -662,7 +668,6 @@ if(giTipoCorrida==1){
 	strcat(sql, "WHERE cm2.numero_cliente = c2.numero_cliente ");
 	strcat(sql, "AND cm2.fecha_activacion < TODAY ");
 	strcat(sql, "AND (cm2.fecha_desactiva IS NULL OR cm2.fecha_desactiva > TODAY)) ");	
-   strcat(sql, "AND s2.numero_cliente = c2.numero_cliente ");
 if(giTipoCorrida==1){
    strcat(sql, "AND m2.numero_cliente = c2.numero_cliente ");
 }   
@@ -818,8 +823,7 @@ if(giTipoCorrida==1){
       sm_transforma t2, sm_transforma t3, OUTER sm_transforma t4, 
       sm_transforma t5, OUTER hislec_reac h2
       WHERE h.numero_cliente = ?
-      AND h.fecha_lectura >= ?
-      and h.corr_facturacion <= ?
+      AND h.fecha_lectura BETWEEN ? AND ?
       AND h.tipo_lectura != 8
       AND t1.clave = 'SRCDETA'
       AND t1.cod_mac_numerico = h.tipo_lectura
@@ -835,6 +839,7 @@ if(giTipoCorrida==1){
       AND h2.corr_facturacion = h.corr_facturacion
       AND h2.tipo_lectura = h.tipo_lectura
       AND h2.fecha_lectura = h.fecha_lectura
+/*      
       UNION
 	  SELECT h.numero_cliente, 
       h.corr_facturacion, 
@@ -871,6 +876,7 @@ if(giTipoCorrida==1){
       AND h2.corr_facturacion = h.corr_facturacion
       AND h2.tipo_lectura = h.tipo_lectura
       AND h2.fecha_lectura = h.fecha_lectura
+*/      
       ORDER BY 3, 4 ASC ";   
 	
 	$DECLARE curLecturas CURSOR WITH HOLD FOR selLecturas;

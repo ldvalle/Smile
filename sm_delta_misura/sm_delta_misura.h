@@ -1,5 +1,5 @@
-$ifndef SMMISURA_H;
-$define SMMISURA_H;
+$ifndef SMDELTAMISURA_H;
+$define SMDELTAMISURA_H;
 
 #include "ustring.h"
 #include "macmath.h"
@@ -14,6 +14,16 @@ $include datetime.h;
 #define SYN_CLAVE "DD_NOVOUT"
 
 /* ---~Estructuras ---*/
+
+$typedef struct{
+	long 	lNroCliente;
+	long 	lFechaNovedad; 
+	char	sTipoOt[3];
+	int		iCorrFacturacion;
+	int		iEstadoCliente;
+	long 	lFechaMoveIn;
+	long 	lFechaBaja;	
+}ClsCliente;
 
 $typedef struct{
    long     numero_cliente;
@@ -39,16 +49,16 @@ $typedef struct{
 /* Prototipos de Funciones */
 short	AnalizarParametros(int, char **);
 void	MensajeParametros(void);
-short	AbreArchivos(int, int);
-short	AbreArchivosActual(int, int);
+short	AbreArchivos(void);
 void  	CreaPrepare(void);
 void 	FechaGeneracionFormateada( char *);
 void 	RutaArchivos( char*, char * );
 
-short	LeoCliente( long *, long *, long *, int *, int *, long *);
+short	LeoCliente( ClsCliente *);
+void	InicializaCliente(ClsCliente *);
 short	LeoLecturasAct(long, int, ClsLectura *, long);
 short	LeoLecturaPend(long, int, ClsLectura *);
-short	LeoLecturas(ClsLectura *, long);
+short	LeoLecturas(ClsLectura *, long, char *);
 void 	InicializaLectura(ClsLectura *);
 
 void	GenerarPlanoMisura(ClsLectura, int, int, long);

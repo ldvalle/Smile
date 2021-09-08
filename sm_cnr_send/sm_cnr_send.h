@@ -21,7 +21,17 @@ $typedef struct{
 	char	id_expediente[15];
 	char	fecha_inspeccion[20];
 	char	tipo_expediente[2];
-	char	anomalia[70];
+	char	cod_anomalia[5];
+	char	desc_anomalia[101];
+	char	categoria[5];
+	int		precedencia;
+	char	desc_categoria[101];
+	char	mot_denuncia_inspe[7];
+	long	lFechaInspeccion;
+	char	sFechaNormalizacion[11];
+	char	sFechaInicioPeriodoCnrFacturado[11];
+	char	sFechaFinPeriodoCnrFacturado[11];
+	
 }ClsCNR;
 
 
