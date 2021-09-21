@@ -296,7 +296,15 @@ $int			iCorrFactu;
 			fflush(pFileLog);
 	
 			if(VerificaCNR(&reg)){
-				
+				if(EstadoModifica(&reg)){
+					$BEGIN WORK;
+					if(!ActualizaCNR(reg)){
+						$ROLLBACK WORK;
+						sprintf(sMsg, "No Actualizo CNR [%s]\n", sLinea);
+						RegistraLog(sMsg);					
+					}
+					$COMMIT WORK;
+				}
 			}else{
 				sprintf(sMsg, "No Verifica CNR [%s]\n", sLinea);
 				RegistraLog(sMsg);
@@ -349,7 +357,19 @@ $ClsLectura	*reg;
 
 	/* Fecha Estado */
 	if (RetornaCampoVar(sCampo, sLinea, '|', 2)){
-		strcpy(reg->fechaEstado, sCampo);
+		alltrim(sCampo, ' ');
+		memset(sAux, '\0', sizeof(sAux));
+		dd/mm/aaaa HH:MM:SS
+		sprintf(sAux, "%c%c%c%c-%c%c-%c%c %c%c:%c%c:%c%c", sCampo[6],sCampo[7],sCampo[8],sCampo[9],
+			sCampo[3],sCampo[4],sCampo[0],sCampo[1],
+			sCampo[11],sCampo[12],sCampo[14],sCampo[15], sCampo[17],sCampo[18]);
+		strcpy(reg->fechaEstado, sAux);
+		
+		memset(sAux, '\0', sizeof(sAux));
+		sprintf(sAux, "%c%c/%c%c/%c%cc%c", sCampo[0],sCampo[1],sCampo[3],sCampo[4],sCampo[6],sCampo[7],sCampo[8,sCampo[9]);
+		alltrim(sAux, ' ');
+		rdefmtdate(&(reg->lFechaCierre), "dd/mm/yyyy", sAux);
+		
 	}
 
 	/* Estado */
@@ -400,6 +420,7 @@ $ClsCNR	*reg;
 	memset(reg->piso_dir, '\0', sizeof(reg->piso_dir));
 	memset(reg->depto_dir, '\0', sizeof(reg->depto_dir));
 	
+	rsetnull(CLONGTYPE, (char *) &(reg->lFechaCierre));
 }
 
 /*
@@ -503,6 +524,32 @@ $char sAux[1000];
 		AND nro_dir = ?
 		AND piso_dir = ?
 		AND depto_dir = ? ";	
+
+	/* Update CNR con Cierre */
+	$PREPARE updCnrCerrado FROM "UPDATE cnr_new SET
+		cod_estado = ?,
+		fecha_finalizacion = ?,
+		fecha_estado = ?, 
+		fecha_desde_periodo = ?, 
+		fecha_hasta_periodo = ?,
+		monto_facturado = ?
+		WHERE sucursal = ?
+		AND nro_expediente = ? ";
+
+	/* Update CNR sin Cierre */
+	$PREPARE updCnrAbierto FROM "UPDATE cnr_new SET
+		cod_estado = ?,
+		fecha_estado = ?, 
+		fecha_desde_periodo = ?, 
+		fecha_hasta_periodo = ?,
+		monto_facturado = ?
+		WHERE sucursal = ?
+		AND nro_expediente = ? ";
+
+	/* Actualiza Cliente */
+	$PREPARE updCliente FROM "UPDATE cliente SET
+		tiene_cnr = ?
+		WHERE numero_cliente = ? ";
 	
 }
 
@@ -592,10 +639,89 @@ $long 		lNroCliente;
 	return 1;
 }
 
+short ActualizaCNR(reg)
+$ClsCNR		reg;
+{
+	char	sMarca[2];
+	
+	/* Actualizo CNR */
+	if(strcmp(reg.cod_estado, "05")== 0 || strcmp(reg.cod_estado, "99")== 0){
+		$EXECUTE updCnrCerrado USING :reg.cod_estado,
+			:reg.lFechaCierre,
+			:reg.fechaEstado,
+			:reg.periodoDesde,
+			:reg.periodoHasta,
+			:reg.monto,
+			:reg.sucursal,
+			:nroExpediente;
+	}else{
+		$EXECUTE updCnrAbierto USING :reg.cod_estado,
+			:reg.fechaEstado,
+			:reg.periodoDesde,
+			:reg.periodoHasta,
+			:reg.monto,
+			:reg.sucursal,
+			:nroExpediente;
+	}
+	
+	if(SQLCODE != 0)
+		return 0;
+	
+	
+	/* Actualizo Cliente */
+	if((strcmp(reg.cod_estado, "05")== 0  || strcmp(reg.cod_estado, "06")== 0 || strcmp(reg.cod_estado, "99")== 0) && (reg.numero_cliente > 0)){
+		memset(sMarca, '\0', sizeof(sMarca));
+		if(strcmp(reg.cod_estado, "05")== 0
+			strcpy(sMarca, "S");
+
+		if(strcmp(reg.cod_estado, "06")== 0
+			strcpy(sMarca, "N");
+
+		if(strcmp(reg.cod_estado, "99")== 0
+			strcpy(sMarca, "N");		
+			
+		$EXECUTE updCliente USING :sMarca, :reg.numero_cliente;
+		
+	}
+	
+	return 1;
+}
 
 
+short EstadoModifica(reg)
+$ClsCNR *reg;
+{
 
-
+	alltrim(reg->estado, ' ');
+	
+	if(strcmp(reg->estado, "INS")==0){
+		return 0;
+	}
+	if(strcmp(reg->estado, "LAV")==0){
+		return 0;
+	}
+	if(strcmp(reg->estado, "NDR")==0){
+		return 0;
+	}
+	
+	if(strcmp(reg->estado, "PRE")==0){
+		strcpy(reg->cod_estado, "04");
+	}
+	if(strcmp(reg->estado, "CON")==0){
+		strcpy(reg->cod_estado, "04");
+	}
+	if(strcmp(reg->estado, "FAT")==0){
+		strcpy(reg->cod_estado, "05");
+	}
+	if(strcmp(reg->estado, "END")==0){
+		strcpy(reg->cod_estado, "06");
+	}
+	if(strcmp(reg->estado, "ANN")==0){
+		strcpy(reg->cod_estado, "99");
+	}
+	
+	return 1;
+}
 
 
 /****************************

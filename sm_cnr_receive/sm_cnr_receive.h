@@ -36,6 +36,7 @@ $typedef struct{
 	char	nro_dir[6];
 	char	piso_dir[7];
 	char	depto_dir[7];
+	long 	lFechaCierre;
 }ClsCNR;
 
 
@@ -50,13 +51,13 @@ void	CargaRegistro( char *, ClsCNR *);
 void	InicializoRegistro(ClsCNR *);
 short 	VerificaCNR(ClsCNR *);
 void 	RegistraLog(char *);
-
 short	AbreArchivos(char *, char *);
 void  	CreaPrepare(void);
-static char 	*strReplace(char *, char *, char *);
 void	CerrarArchivos(void);
+short 	ActualizaCNR(ClsCNR);
+short 	EstadoModifica(ClsCNR * );
 
-
+static char 	*strReplace(char *, char *, char *);
 char *substring(char *, int, int);
 int  instr(char *, char *);
 
