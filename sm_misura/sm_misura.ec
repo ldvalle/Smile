@@ -624,6 +624,12 @@ $char sAux[1000];
 	
 	$PREPARE selFechaActual FROM $sql;	
 
+	/******** Fecha Actual Natural ****************/
+	strcpy(sql, "SELECT max(fecha_lectura) FROM hislec WHERE numero_cliente = ? and tipo_lectura = 5 ");
+	
+	$PREPARE selFechaActualNat FROM $sql;	
+
+
    /* Fecha Inicio Lecturas */
    $PREPARE selFechaInicio FROM "SELECT TODAY - 1460 FROM dual ";
    
@@ -674,7 +680,10 @@ if(giTipoCorrida==1){
 	/******** LECTURAS ACTUALES  ****************/
    $PREPARE selLecturasAct FROM "SELECT FIRST 1 h.numero_cliente, 
       h.corr_facturacion, 
-      h.fecha_lectura, 
+      CASE
+		WHEN h.tipo_lectura = 7 THEN h.fecha_lectura + 1
+		ELSE h.fecha_lectura
+      END,
       h.tipo_lectura, 
       h.lectura_facturac, 
       h.lectura_terreno, 
@@ -764,8 +773,11 @@ if(giTipoCorrida==1){
 	
 	/******** Ultima Lectura Real  ****************/
    $PREPARE selUltiLectuReal FROM "SELECT h.numero_cliente, 
-      h.corr_facturacion, 
-      h.fecha_lectura, 
+      h.corr_facturacion,
+      CASE
+		WHEN h.tipo_lectura = 7 THEN h.fecha_lectura + 1
+		ELSE h.fecha_lectura
+      END, 
       h.tipo_lectura, 
       h.lectura_facturac, 
       h.lectura_terreno, 
@@ -800,8 +812,11 @@ if(giTipoCorrida==1){
 	
    /******** Cursor LECTURAS HISTO  ****************/
    $PREPARE selLecturas FROM "SELECT h.numero_cliente, 
-      h.corr_facturacion, 
-      h.fecha_lectura, 
+      h.corr_facturacion,
+      CASE 
+		WHEN h.tipo_lectura IN (6, 7) THEN h.fecha_lectura + 1
+		ELSE h.fecha_lectura
+      END, 
       h.tipo_lectura, 
       h.lectura_facturac, 
       h.lectura_terreno, 
@@ -838,7 +853,10 @@ if(giTipoCorrida==1){
       UNION
 	  SELECT h.numero_cliente, 
       h.corr_facturacion, 
-      h.fecha_lectura, 
+      CASE
+		WHEN h.tipo_lectura = 7 THEN h.fecha_lectura + 1
+		ELSE h.fecha_lectura
+      END,
       h.tipo_lectura, 
       h.lectura_facturac, 
       h.lectura_terreno, 
@@ -992,11 +1010,20 @@ AND f1.corr_facturacion = 95
 		AND tipo_lectura NOT IN (5, 6) ";
 		
 	/* Fecha de Baja */
-	$PREPARE selBaja FROM "SELECT MAX(fecha_ejecucion) FROM ot_final
+	$PREPARE selBaja FROM "SELECT MAX(DATE(fecha_modif)) FROM modif
+	WHERE numero_cliente = ?
+	AND codigo_modif = '58' ";
+
+	/* baja x OT */
+	$PREPARE selBajaOT FROM "SELECT MAX(fecha_ejecucion) FROM ot_final
 		WHERE numero_cliente = ?
 		AND proced = 'RETCLI' ";
 
-		
+	/* ultima lectura */
+	$PREPARE selUltimaLectura FROM "SELECT count(*) FROM hislec 
+		WHERE numero_cliente = ?
+		AND fecha_lectura = ?
+		AND tipo_lectura = 6 ";
 }
 
 void FechaGeneracionFormateada( Fecha )
@@ -1057,6 +1084,7 @@ $long *lFBaja;
    $int  iCorrFactu;
    $int	 iStsCliente;
    $long lFechaBaja;
+   $int  iCant=0;
    
    $FETCH curClientes INTO :nroCliente, :lFecha, :lFechaMV, :iCorrFactu, :iStsCliente;
    
@@ -1071,12 +1099,29 @@ $long *lFBaja;
    *iEstadoCliente = iStsCliente;
 
 	if(iStsCliente != 0){
-		$EXECUTE selBaja INTO :lFechaBaja USING :nroCliente;
 		
-		if(SQLCODE == 0)
-			*lFBaja = lFechaBaja;
+		$EXECUTE selFechaActualNat INTO :lFechaBaja USING :nroCliente;
+		
+		
+		$EXECUTE selUltimaLectura INTO :iCant USING :nroCliente, :lFechaBaja;
+		
+		if( iCant > 0 )
+			lFechaBaja++;		
+		
+/*		
+		$EXECUTE selBajaOT INTO :lFechaBaja USING :nroCliente;
+		
+		if(risnull(CLONGTYPE, (char *) &(lFechaBaja))){
+			$EXECUTE selBaja INTO :lFechaBaja USING :nroCliente;
+			
+			if(SQLCODE != 0){
+				$EXECUTE selFechaActualNat INTO :lFechaBaja USING :nroCliente;
+			}			
+		}
+*/
+		
+		*lFBaja = lFechaBaja;
 	}
-	
 	
    return 1;
 }

@@ -13,7 +13,7 @@ $include datetime.h;
 
 #define SYN_CLAVE "DD_NOVOUT"
 
-/* Estructuras ***/
+/*** Estructuras ***/
 $typedef struct{
    long  numero_cliente;
    int   corr_facturacion;

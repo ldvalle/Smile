@@ -132,7 +132,7 @@ char	sFechaHasta[11];
 	$SET LOCK MODE TO WAIT 600;
 	$SET ISOLATION TO DIRTY READ;
 	
-	strcpy(sFechaHasta, "29/02/2020");
+	strcpy(sFechaHasta, "30/06/2020");
 	rsetnull(CLONGTYPE, (char *) &(lFechaHasta));
 	rdefmtdate(&lFechaHasta, "dd/mm/yyyy", sFechaHasta);
 	
@@ -235,7 +235,7 @@ char	sFechaHasta[11];
 	cantProcesada=0;
 	iIndexFile=1;
 	
-	for(iPlan=41; iPlan <= 80; iPlan++){
+	for(iPlan=54; iPlan <= 80; iPlan++){
 		if(!AbreArchivos(iPlan, iIndexFile)){
 			exit(1);	
 		}
@@ -508,11 +508,11 @@ int   iIndex;
 
 	sprintf( sArchMisuraUnx  , "%sLEITURA_T1.unx", sPathSalida );
    sprintf( sArchMisuraAux  , "%sLEITURA_T1.aux", sPathSalida );
-   sprintf( sArchMisuraDos  , "%spreLEITURA_T1_%s_%d_%d.txt", sPathSalida, sFecha, iPlan, iIndex);
+   sprintf( sArchMisuraDos  , "%sLEITURA_T1_%s_%d_%d.txt", sPathSalida, sFecha, iPlan, iIndex);
 
 	sprintf( sArchMisuraAdjUnx  , "%sADJUNTO_LEITURA_T1.unx", sPathSalida );
    sprintf( sArchMisuraAdjAux  , "%sADJUNTO_LEITURA_T1.aux", sPathSalida );
-   sprintf( sArchMisuraAdjDos  , "%spreADJUNTO_LEITURA_T1_%s_%d_%d.txt", sPathSalida, sFecha, iPlan, iIndex);
+   sprintf( sArchMisuraAdjDos  , "%sADJUNTO_LEITURA_T1_%s_%d_%d.txt", sPathSalida, sFecha, iPlan, iIndex);
 
 
 	pFileMisura=fopen( sArchMisuraUnx, "w" );
@@ -631,12 +631,19 @@ $char sAux[1000];
 	
 	$PREPARE selFechaActual FROM $sql;	
 
+	/******** Fecha Actual Natural ****************/
+	strcpy(sql, "SELECT max(fecha_lectura) FROM hislec WHERE numero_cliente = ? AND tipo_lectura = 5 ");
+	
+	$PREPARE selFechaActualNat FROM $sql;	
+
+
+
    /* Fecha Inicio Lecturas */
    $PREPARE selFechaInicio FROM "SELECT TODAY - 1460 FROM dual ";
    
 	/******** Cursor CLIENTES  ****************/	
-	strcpy(sql, "SELECT c.numero_cliente, TODAY, (TODAY-420), c.corr_facturacion, c.estado_cliente ");
-	strcat(sql, "FROM cliente c ");
+	strcpy(sql, "SELECT c.numero_cliente, NVL(s.fecha_pivote, TODAY), NVL(s.fecha_move_in, TODAY), c.corr_facturacion, c.estado_cliente ");
+	strcat(sql, "FROM cliente c, OUTER sap_regi_cliente s ");
 if(giTipoCorrida==1){
    strcat(sql, ", sm_universo m ");
 }   
@@ -646,15 +653,16 @@ if(giTipoCorrida==1){
 	strcat(sql, "AND NOT EXISTS (SELECT 1 FROM clientes_ctrol_med cm ");
 	strcat(sql, "WHERE cm.numero_cliente = c.numero_cliente ");
 	strcat(sql, "AND cm.fecha_activacion < TODAY ");
-	strcat(sql, "AND (cm.fecha_desactiva IS NULL OR cm.fecha_desactiva > TODAY)) ");	
+	strcat(sql, "AND (cm.fecha_desactiva IS NULL OR cm.fecha_desactiva > TODAY)) ");
+	strcat(sql, "AND s.numero_cliente = c.numero_cliente ");	
 if(giTipoCorrida==1){
    strcat(sql, "AND m.numero_cliente = c.numero_cliente ");
 }   
 
 	strcat(sql, "UNION ");
 
-	strcat(sql, "SELECT c2.numero_cliente, TODAY, (TODAY - 420), c2.corr_facturacion, c2.estado_cliente ");
-	strcat(sql, "FROM cliente c2, bal_cliente b ");
+	strcat(sql, "SELECT c2.numero_cliente, NVL(s2.fecha_pivote, TODAY), NVL(s.fecha_move_in, TODAY), c2.corr_facturacion, c2.estado_cliente ");
+	strcat(sql, "FROM cliente c2, bal_cliente b, OUTER sap_regi_cliente s2 ");
 if(giTipoCorrida==1){
    strcat(sql, ", sm_universo m2 ");
 }   
@@ -668,6 +676,7 @@ if(giTipoCorrida==1){
 	strcat(sql, "WHERE cm2.numero_cliente = c2.numero_cliente ");
 	strcat(sql, "AND cm2.fecha_activacion < TODAY ");
 	strcat(sql, "AND (cm2.fecha_desactiva IS NULL OR cm2.fecha_desactiva > TODAY)) ");	
+	strcat(sql, "AND s2.numero_cliente = c.numero_cliente ");	
 if(giTipoCorrida==1){
    strcat(sql, "AND m2.numero_cliente = c2.numero_cliente ");
 }   
@@ -805,8 +814,11 @@ if(giTipoCorrida==1){
 	
    /******** Cursor LECTURAS HISTO  ****************/
    $PREPARE selLecturas FROM "SELECT h.numero_cliente, 
-      h.corr_facturacion, 
-      h.fecha_lectura, 
+      h.corr_facturacion,
+      CASE 
+		WHEN h.tipo_lectura IN (6, 7) THEN h.fecha_lectura + 1
+		ELSE h.fecha_lectura
+      END fecha_lectura,  
       h.tipo_lectura, 
       h.lectura_facturac, 
       h.lectura_terreno, 
@@ -998,11 +1010,21 @@ AND f1.corr_facturacion = 95
 		AND tipo_lectura NOT IN (5, 6) ";
 		
 	/* Fecha de Baja */
-	$PREPARE selBaja FROM "SELECT MAX(fecha_ejecucion) FROM ot_final
+	$PREPARE selBaja FROM "SELECT MAX(DATE(fecha_modif)) FROM modif
+	WHERE numero_cliente = ?
+	AND codigo_modif = '58' ";
+	
+	/* baja x OT */
+	$PREPARE selBajaOT FROM "SELECT MAX(fecha_ejecucion) FROM ot_final
 		WHERE numero_cliente = ?
 		AND proced = 'RETCLI' ";
 
-		
+	/* ultima lectura */
+	$PREPARE selUltimaLectura FROM "SELECT count(*) FROM hislec 
+		WHERE numero_cliente = ?
+		AND fecha_lectura = ?
+		AND tipo_lectura = 6 ";
+	
 }
 
 void FechaGeneracionFormateada( Fecha )
@@ -1063,6 +1085,8 @@ $long *lFBaja;
    $int  iCorrFactu;
    $int	 iStsCliente;
    $long lFechaBaja;
+   $int	iCant=0;
+
    
    $FETCH curClientes INTO :nroCliente, :lFecha, :lFechaMV, :iCorrFactu, :iStsCliente;
    
@@ -1076,11 +1100,29 @@ $long *lFBaja;
    *iCorrFacturacion = iCorrFactu;
    *iEstadoCliente = iStsCliente;
 
+
 	if(iStsCliente != 0){
-		$EXECUTE selBaja INTO :lFechaBaja USING :nroCliente;
 		
-		if(SQLCODE == 0)
-			*lFBaja = lFechaBaja;
+		$EXECUTE selFechaActualNat INTO :lFechaBaja USING :nroCliente;
+		
+		
+		$EXECUTE selUltimaLectura INTO :iCant USING :nroCliente, :lFechaBaja;
+		
+		if( iCant > 0 )
+			lFechaBaja++;
+		
+/*		
+		$EXECUTE selBajaOT INTO :lFechaBaja USING :nroCliente;
+		
+		if(risnull(CLONGTYPE, (char *) &(lFechaBaja))){
+			$EXECUTE selBaja INTO :lFechaBaja USING :nroCliente;
+			
+			if(SQLCODE != 0){
+				$EXECUTE selFechaActualNat INTO :lFechaBaja USING :nroCliente;
+			}			
+		}
+*/		
+		*lFBaja = lFechaBaja;
 	}
 	
 	

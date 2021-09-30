@@ -10,7 +10,7 @@
 		Carga de Lecturas de Ciclo a MAC
 		
 	Descripcion de parametros :
-		<Base de Datos> : Base de Datos <INSPECC>
+		<Base de Datos> : Base de Datos <SYNERGIA>
 		
 **********************************************************************************/
 #include <stdio.h>
@@ -107,13 +107,13 @@ char		unxCmd[500];
 			memset(sArchivoTrabajo, '\0', sizeof(sArchivoTrabajo));
 			memset(unxCmd, '\0', sizeof(unxCmd));
 
-
 			sprintf(sArchivoTrabajo, "%s%s", sPathEntrada, sSoloArchivoEntrada);
 			
 			if(! AbreArchivos(sSoloArchivoEntrada, sArchivoTrabajo)){
 				exit(1);
 			}
 			if(ProcesaArchivo()){
+				printf("Archivo %s Procesado\n", sSoloArchivoEntrada);
 				cantArchivos++;
 				
 				sprintf(unxCmd, "mv -f %s%s %s%s", sPathEntrada, sSoloArchivoEntrada, sPathRepo, sSoloArchivoEntrada);
@@ -127,7 +127,15 @@ char		unxCmd[500];
 				sprintf(unxCmd, "rm -f %s", sArchivoTrabajo);
 			}	
 		}else{
-			printf("Archivo [%s] NO valido\n", sSoloArchivoEntrada);
+			memset(unxCmd, '\0', sizeof(unxCmd));
+			if (strcmp(sSoloArchivoEntrada, ".")  != 0 && strcmp(sSoloArchivoEntrada, "..") != 0){
+				printf("Archivo [%s] NO valido\n", sSoloArchivoEntrada);
+				sprintf(unxCmd, "mv -f %s%s %s%s", sPathEntrada, sSoloArchivoEntrada, sPathRepo, sSoloArchivoEntrada);
+				if (system(unxCmd) != 0){
+					printf("Error al mover archivo [%s] al repositorio.\n%s\n", sSoloArchivoEntrada, unxCmd);
+					exit(1);
+				}			
+			}
 		}
 	}
 
@@ -173,7 +181,7 @@ char	* argv[];
 
 void MensajeParametros(void){
 		printf("Error en Parametros.\n");
-		printf("	<Base> = inspecc.\n");
+		printf("	<Base> = synergia.\n");
 }
 
 
@@ -215,7 +223,7 @@ char	*sArchivo;
 	
 	memset(sMascara, '\0', sizeof(sMascara));
 	
-	strcpy(sMascara, "LEITURA_T1");
+	strcpy(sMascara, "LectuOut_ED01T1");
 
 	alltrim(sArchivo, ' ');
 	
@@ -227,7 +235,7 @@ char	*sArchivo;
 	if(iLargo < 16){
 		return 0;
 	}
-	sSubCadena = substring(sArchivo, 1, 16);
+	sSubCadena = substring(sArchivo, 1, 15);
 	/*alltrim(sSubCadena, ' ');*/
 
 	if( strcmp(sSubCadena, sMascara)!= 0){
@@ -274,50 +282,68 @@ short ProcesaArchivo(){
 char			sLinea[10000];
 $ClsLectura	reg;
 long   			iLinea;
-char			sMsg[1000];
+char			sMsg[10000];
 $int			iCorrFactu;
 
-	fgets(sLinea, 1000, pFileEntrada);
+	fgets(sLinea, 10000, pFileEntrada);
 	iLinea=0;
 	while (!feof(pFileEntrada)){
-		sprintf(sMsg, "Procesando Linea %ld\n", iLinea);
-		
-		RegistraLog(sMsg);
-		fflush(pFileLog);
-		
-		memset(sMsg, '\0', sizeof(sMsg));
-		
-		cantLecturas++;
-		CargaRegistro( sLinea, &reg);
-
-		strcpy(sMsg, "\tLinea Procesada\n");
-		RegistraLog(sMsg);
-		fflush(pFileLog);
-		
-		iCorrFactu=0;
-		if(VerificaCliente(&iCorrFactu, reg.nroCliente){
-			$BEGIN WORK;
+		if(iLinea > 0){
+			sprintf(sMsg, "Procesando Linea %ld\n", iLinea);
 			
-			if(!risnull(CLONGTYPE, (char *) &(reg.fechaAjuste))){
-				if(!CargaLecturaFacturada(iCorrFactu, reg)){
-					$ROLLBACK WORK;
-					strcpy(sMsg, "Facturada Erronea [%s]\n", sLinea);
-					RegistraLog(sMsg);
-				}
-			}else{
-				if(!CargaLecturaAjustada(reg)){
-					$ROLLBACK WORK;
-					strcpy(sMsg, "Ajustada Erronea [%s]\n", sLinea);
+			RegistraLog(sMsg);
+			fflush(pFileLog);
+			
+			memset(sMsg, '\0', sizeof(sMsg));
+			
+			cantLecturas++;
+			CargaRegistro( sLinea, &reg);
+
+			strcpy(sMsg, "\tLinea Procesada\n");
+			RegistraLog(sMsg);
+			fflush(pFileLog);
+/*	
+memset(sMsg, '\0', sizeof(sMsg));
+sprintf(sMsg,"Cliente %ld", reg.nroCliente);
+sprintf(sMsg, "%s Tarifa %s", sMsg, reg.sTipoTarifa);	
+sprintf(sMsg, "%s Medidor %ld %s %s ", sMsg, reg.nroMedidor, reg.marcaMedidor, reg.modeloMedidor);	
+sprintf(sMsg, "%s Tarifa %s", sMsg, reg.sTipoTarifa);	
+sprintf(sMsg, "%s Lectura Facturac %f Lectura Terreno %f Consumo %ld ", sMsg, reg.lecturaFacturacActiva, reg.lecturaTerrenoActiva, reg.consumoActivo);
+sprintf(sMsg, "%s Fecha Lectura %ld Tipo Lectura %d  claveLectura [%s]\n", sMsg, reg.fechaLectura, reg.tipoLectura, reg.claveLectura);+
+printf(sMsg);
+*/
+			if(strcmp(reg.sTipoTarifa, "T1")==0){
+				iCorrFactu=0;
+				if(VerificaCliente(&iCorrFactu, reg.nroCliente)){
+					$BEGIN WORK;
+					
+					if(reg.fechaAjuste==0){
+						if(EsLecturaNueva(reg)){
+							if(!CargaLecturaFacturada(iCorrFactu, reg)){
+								$ROLLBACK WORK;
+								sprintf(sMsg, "Facturada Erronea [%s]\n", sLinea);
+								RegistraLog(sMsg);
+							}
+						}else{
+							sprintf(sMsg, "Lectura Preexistente [%s]\n", sLinea);
+							RegistraLog(sMsg);
+						}
+					}else{
+						if(!CargaLecturaAjustada(reg)){
+							$ROLLBACK WORK;
+							sprintf(sMsg, "Ajustada Erronea [%s]\n", sLinea);
+							RegistraLog(sMsg);
+						}
+					}
+					
+					$COMMIT WORK;
+				}else{
+					sprintf(sMsg, "No Verifica Cliente [%s]\n", sLinea);
 					RegistraLog(sMsg);
 				}
 			}
-			
-			$COMMIT WORK;
-		}else{
-			strcpy(sMsg, "No Verifica Cliente [%s]\n", sLinea);
-			RegistraLog(sMsg);
+
 		}
-		
 		fgets(sLinea, 10000, pFileEntrada);
 		iLinea++;
 	}
@@ -355,17 +381,32 @@ $ClsLectura	*reg;
 		reg->nroCliente = atol(sAux);
 	}
 
-	/* corrFacturacion */
+	/* Tipo Tarifa */
+	if (RetornaCampoVar(sCampo, sLinea, '|', 3)){
+		strcpy(reg->sTipoTarifa, sCampo);
+		alltrim(reg->sTipoTarifa, ' ');
+	}
+
+	/* marca medidor */
+	if (RetornaCampoVar(sCampo, sLinea, '|', 6)){
+		strcpy(reg->marcaMedidor, sCampo);
+	}
+
+	/* modelo medidor */
+	if (RetornaCampoVar(sCampo, sLinea, '|', 7)){
+		strcpy(reg->modeloMedidor, sCampo);
+	}
 	
 	/* Nro.Medidor */
-	if (RetornaCampoVar(sCampo, sLinea, '|', 3)){
+	if (RetornaCampoVar(sCampo, sLinea, '|', 8)){
 		reg->nroMedidor = atol(sCampo);
 	}
 	
-	/* marca medidor */
-	if (RetornaCampoVar(sCampo, sLinea, '|', 4)){
-		reg->marcaMedidor = atol(sCampo);
+	/* Fecha Lectura*/
+	if (RetornaCampoVar(sCampo, sLinea, '|', 10)){
+		rdefmtdate(&(reg->fechaLectura), "dd/mm/yyyy", sCampo);
 	}
+
 	
 	/* Lectura Facturada Activa*/
 	if (RetornaCampoVar(sCampo, sLinea, '|', 15)){
@@ -374,21 +415,30 @@ $ClsLectura	*reg;
 	
 	/* Lectura Facturada ReActiva*/
 	if (RetornaCampoVar(sCampo, sLinea, '|', 16)){
-		alltrim(sCampo, ' ')
-		if(strcmp(sCampo, "")!= 0
+		alltrim(sCampo, ' ');
+		if(strcmp(sCampo, "")!= 0)
 			reg->lecturaFacturacReactiva = atof(sCampo);
 	}
 	
-	/* LecturaTerreno Activa */
-	if (RetornaCampoVar(sCampo, sLinea, '|', 41)){
-		reg->lecturaTerrenoActiva = atof(sCampo);
-	}
-	
-	/* LecturaTerreno ReActiva */
-	if (RetornaCampoVar(sCampo, sLinea, '|', 42)){
-		alltrim(sCampo, ' ')
-		if(strcmp(sCampo, "")!= 0
-			reg->lecturaTerrenoReactiva = atof(sCampo);
+	/* Tipo Lectura */
+	if (RetornaCampoVar(sCampo, sLinea, '|', 23)){
+		alltrim(sCampo, ' ');
+		reg->tipoLectura = atoi(sCampo);
+		switch (reg->tipoLectura){
+			case 0:
+				reg->tipoLectura=2;
+				break;
+			case 3:
+				reg->tipoLectura=4;
+				break;
+			case 4:
+				reg->tipoLectura=3;
+				break;
+			
+		}
+		/* Si es 1 mantiene el 1
+		   Si son 5 o 6 son lecturas de ajuste 
+		*/
 	}
 	
 	/* Consumo Activa */
@@ -398,171 +448,55 @@ $ClsLectura	*reg;
 	
 	/* Consumo Reactiva */
 	if (RetornaCampoVar(sCampo, sLinea, '|', 29)){
-		alltrim(sCampo, ' ')
-		if(strcmp(sCampo, "")!= 0
+		alltrim(sCampo, ' ');
+		if(strcmp(sCampo, "")!= 0)
 			reg->consumoReactivo = atol(sCampo);
 	}
 	
-	/* Fecha Lectura*/
-	if (RetornaCampoVar(sCampo, sLinea, '|', 10)){
-		rdefmtdate(&(reg->fechaLectura), "dd/mm/yyyy", sCampo)
-	}
-
 	/* Clave Lectura */
 	if (RetornaCampoVar(sCampo, sLinea, '|', 36)){
 		alltrim(sCampo, ' ');
-		strcpy(reg->claveLectura, sCampo);
+		if(strcmp(sCampo, "")!= 0){
+			i=atoi(sCampo);
+			sprintf(reg->claveLectura, "%02d", i);
+			strcpy(reg->claveLectura, sCampo);
+		}
+	}
+
+	
+	/* LecturaTerreno Activa */
+	if (RetornaCampoVar(sCampo, sLinea, '|', 41)){
+		reg->lecturaTerrenoActiva = atof(sCampo);
 	}
 	
-	/* Tipo Lectura */
-	if (RetornaCampoVar(sCampo, sLinea, '|', 23)){
+	/* LecturaTerreno ReActiva */
+	if (RetornaCampoVar(sCampo, sLinea, '|', 42)){
 		alltrim(sCampo, ' ');
-		reg->tipoLectura = atoi(sCampo);
+		if(strcmp(sCampo, "")!= 0 )
+			reg->lecturaTerrenoReactiva = atof(sCampo);
 	}
+	
 	
 	/* Constante */
 	reg->constante = 1;
 	
 	/* Correlativo Contador */
-	ret->correlContador = 1;
+	reg->correlContador = 1;
 	
 	/* Coseno Phi */
 	
 	/* Fecha Ajuste */
-	if (RetornaCampoVar(sCampo, sLinea, '|', 99)){
+	if (RetornaCampoVar(sCampo, sLinea, '|', 56)){
 		alltrim(sCampo, ' ');
-		rdefmtdate(&(reg->fechaAjuste), "dd/mm/yyyy", sCampo)
+		if(strcmp(sCampo, "31/12/9999 23:59:59")==0){
+			reg->fechaAjuste=0;
+		}else{
+			reg->fechaAjuste=1;
+		}
+		/*rdefmtdate(&(reg->fechaAjuste), "dd/mm/yyyy HH:MM:SS", sCampo)*/
 	}
 
 
-
-/************/
-	if (RetornaCampoVar(sCampo, sLinea, '\t', 2)){
-		reg->nro_medidor = atol(sCampo);
-	}
-
-	if (RetornaCampoVar(sCampo, sLinea, '\t', 3)){
-		strcpy(reg->cod_motivo, sCampo);
-		alltrim(reg->cod_motivo, ' ');
-	}
-
-	if (RetornaCampoVar(sCampo, sLinea, '\t', 5)){
-		iRcv=atoi(sCampo);
-		memset(sCampo, '\0', sizeof(sCampo));
-		sprintf(sCampo, "%04d", iRcv);
-		strcpy(reg->cod_sucursal, sCampo);
-		alltrim(reg->cod_sucursal, ' ');
-	}
-
-	if (RetornaCampoVar(sCampo, sLinea, '\t', 7)){
-		iRcv=atoi(sCampo);
-		memset(sCampo, '\0', sizeof(sCampo));
-		sprintf(sCampo, "%03d", iRcv);
-		strcpy(reg->cod_partido, sCampo);
-		alltrim(reg->cod_partido, ' ');
-	}
-
-
-	if (RetornaCampoVar(sCampo, sLinea, '\t', 8)){
-		strcpy(reg->nom_partido, sCampo);
-		alltrim(reg->nom_partido, ' ');
-	}
-
-	if (RetornaCampoVar(sCampo, sLinea, '\t', 9)){
-		iRcv=atoi(sCampo);
-		memset(sCampo, '\0', sizeof(sCampo));
-		sprintf(sCampo, "%03d", iRcv);
-		strcpy(reg->cod_localidad, sCampo);
-		alltrim(reg->cod_localidad, ' ');
-	}
-
-	if (RetornaCampoVar(sCampo, sLinea, '\t', 10)){
-		strcpy(reg->nom_localidad, sCampo);
-		alltrim(reg->nom_localidad, ' ');
-	}
-
-	if (RetornaCampoVar(sCampo, sLinea, '\t', 11)){
-		strcpy(sCampo, strReplace(sCampo, "\"", "´"));
-		strcpy(sCampo, strReplace(sCampo, ",", " "));
-		strcpy(sCampo, strReplace(sCampo, "\n", " "));
-		
-		strcpy(reg->nom_calle, sCampo);
-		alltrim(reg->nom_calle, ' ');
-	}
-
-	if (RetornaCampoVar(sCampo, sLinea, '\t', 12)){
-		strcpy(reg->altura, sCampo);
-		alltrim(reg->altura, ' ');
-	}
-
-	if (RetornaCampoVar(sCampo, sLinea, '\t', 13)){
-		strcpy(reg->piso, sCampo);
-		alltrim(reg->piso, ' ');
-	}
-
-	if (RetornaCampoVar(sCampo, sLinea, '\t', 14)){
-		strcpy(reg->depto, sCampo);
-		alltrim(reg->depto, ' ');
-	}
-
-	if (RetornaCampoVar(sCampo, sLinea, '\t', 15)){
-		strcpy(sCampo, strReplace(sCampo, "\"", "´"));
-		strcpy(sCampo, strReplace(sCampo, ",", " "));
-		strcpy(sCampo, strReplace(sCampo, "\n", " "));
-		
-		strcpy(reg->nom_entre_calle1, sCampo);
-		alltrim(reg->nom_entre_calle1, ' ');
-	}
-
-	if (RetornaCampoVar(sCampo, sLinea, '\t', 16)){
-		strcpy(sCampo, strReplace(sCampo, "\"", "´"));
-		strcpy(sCampo, strReplace(sCampo, ",", " "));
-		strcpy(sCampo, strReplace(sCampo, "\n", " "));
-		
-		strcpy(reg->nom_entre_calle2, sCampo);
-		alltrim(reg->nom_entre_calle2, ' ');
-	}
-
-
-	if (RetornaCampoVar(sCampo, sLinea, '\t', 17)){
-		strcpy(sCampo, strReplace(sCampo, "\"", "´"));
-		strcpy(sCampo, strReplace(sCampo, ",", " "));
-		strcpy(sCampo, strReplace(sCampo, "\n", " "));
-		strcpy(reg->observaciones, sCampo);
-		alltrim(reg->observaciones, ' ');
-	}
-
-
-	if (RetornaCampoVar(sCampo, sLinea, '\t', 20)){
-		strcpy(reg->denunciante, sCampo);
-		alltrim(reg->denunciante, ' ');
-	}
-
-	if (RetornaCampoVar(sCampo, sLinea, '\t', 23)){
-		strcpy(reg->plan, sCampo);
-		alltrim(reg->plan, ' ');
-	}
-
-	if (RetornaCampoVar(sCampo, sLinea, '\t', 24)){
-		strcpy(reg->radio, sCampo);
-		alltrim(reg->radio, ' ');
-	}
-
-	if (RetornaCampoVar(sCampo, sLinea, '\t', 25)){
-		strcpy(reg->recorrido, sCampo);
-		alltrim(reg->recorrido, ' ');
-	}
-
-/*
-	strcpy(reg->observaciones, strReplace(reg->observaciones, "\"", "´"));
-
-	strcpy(reg->observaciones, strReplace(reg->observaciones, "\n", " "));
-
-	strcpy(reg->observaciones, strReplace(reg->observaciones, "\t", " "));
-
-	strcpy(reg->observaciones, strReplace(reg->observaciones, ",", " "));
-*/
-	alltrim(reg->observaciones, ' ');
 
 
 }
@@ -573,8 +507,10 @@ $ClsLectura	*reg;
 
 	rsetnull(CLONGTYPE, (char *) &(reg->nroCliente));
 	rsetnull(CINTTYPE, (char *) &(reg->corrFacturacion));
+	memset(reg->sTipoTarifa, '\0', sizeof(reg->sTipoTarifa));
 	rsetnull(CLONGTYPE, (char *) &(reg->nroMedidor));
 	memset(reg->marcaMedidor, '\0', sizeof(reg->marcaMedidor));
+	memset(reg->modeloMedidor, '\0', sizeof(reg->modeloMedidor));
 	
 	rsetnull(CFLOATTYPE, (char *) &(reg->lecturaFacturacActiva));
 	rsetnull(CFLOATTYPE, (char *) &(reg->lecturaTerrenoActiva));
@@ -595,18 +531,6 @@ $ClsLectura	*reg;
 	rsetnull(CLONGTYPE, (char *) &(reg->fechaAjuste));
 	
 }
-
-short ValidoRegistro(reg)
-$ClsDenuncia	reg;
-{
-	char sLineaLog[1000];
-	int  iRcv;
-		
-	memset(sLineaLog, '\0', sizeof(sLineaLog));
-	return 1;
-}
-
-
 
 /*
 void FormateaArchivos(void){
@@ -682,12 +606,12 @@ $char sAux[1000];
 		fecha_lectura,
 		clave_lectura,
 		tipo_lectura,
-		constante
+		constante,
 		correl_contador
 		)VALUES(?,?,?,?,?,?,?,?,?,?,1,1) ";
 		
 	/** Inserta Hislec Reac **/
-	$PREPARE insHislecReac FROM "INSERT INTO hiselec_reac(
+	$PREPARE insHislecReac FROM "INSERT INTO hislec_reac(
 		numero_cliente,
 		corr_facturacion,
 		numero_medidor,
@@ -698,7 +622,7 @@ $char sAux[1000];
 		fecha_lectura,
 		tipo_lectura,
 		coseno_phi
-		)VALUES(?,?,?,?,?,?,?,?,?,100) ");
+		)VALUES(?,?,?,?,?,?,?,?,?,100) ";
 
 	/** Actualiza Cliente **/
 	$PREPARE updCliente FROM "UPDATE cliente SET
@@ -722,109 +646,45 @@ $char sAux[1000];
 		AND marca_medidor = ?
 		AND estado = 'I' ";
 
+	/* Trae Lectura original */
+	$PREPARE selLectuOri FROM "SELECT corr_facturacion, tipo_lectura FROM hislec
+		WHERE numero_cliente = ?
+		AND fecha_lectura = ? 
+		AND tipo_lectura IN (1, 2, 3, 4) ";
 
-}
-
-short ExisteCliente(nroCliente, reg)
-$long			nroCliente;
-$ClsSolicitud	*reg;
-{
-	char	sMsgErr[100];
-	$char	sTieneCnr[2];
-	
-	memset(sMsgErr, '\0', sizeof(sMsgErr));
-	memset(sTieneCnr, '\0', sizeof(sTieneCnr));
-	
-	InicializaSolicitud(reg);
-	
-	$EXECUTE selCliente INTO
-		:reg->numero_cliente,
-		:reg->sucursal,
-		:reg->plan,
-		:reg->radio,
-		:reg->correlativo_ruta,
-		:sTieneCnr,
-		:reg->dir_provincia,
-		:reg->dir_nom_provincia,
-		:reg->dir_partido,
-		:reg->dir_nom_partido,
-		:reg->dir_comuna,
-		:reg->dir_nom_comuna,
-		:reg->dir_cod_calle,
-		:reg->dir_nom_calle,
-		:reg->dir_numero,
-		:reg->dir_piso, 
-		:reg->dir_depto,
-		:reg->dir_cod_postal,
-		:reg->telefono,
-		:reg->dir_cod_entre,
-		:reg->dir_nom_entre,
-		:reg->dir_cod_entre1,
-		:reg->dir_nom_entre1,
-		:reg->dir_observacion,
-		:reg->dir_cod_barrio,
-		:reg->dir_nom_barrio,
-		:reg->dir_manzana,
-		:reg->nombre,
-		:reg->tip_doc,
-		:reg->nro_doc,
-		:reg->antiguedad_saldo,
-		:reg->estado_cliente,
-		:reg->nro_medidor,
-		:reg->marca_medidor,
-		:reg->modelo_medidor
-	USING :nroCliente;
+	/* Trae Correlativo de Refac */
+	$PREPARE selCorrRefac FROM "SELECT NVL(MAX(corr_refacturacion),0) FROM hislec_refac
+		WHERE numero_cliente = ? ";
 		
-	if(SQLCODE != 0){
-		if(SQLCODE == 100){
-			sprintf(sMsgErr, "Cliente %ld NO existe.\n", nroCliente);
-			RegistraLog(sMsgErr);
-			return 0;
-		}else{
-			sprintf(sMsgErr, "Cliente %ld. Error buscando cliente.\n", nroCliente);
-			RegistraLog(sMsgErr);
-			return 0;
-		}
-	}else{
-		if(reg->estado_cliente != 0){
-			sprintf(sMsgErr, "Cliente %ld. Ya no es un cliente activo.\n", nroCliente);
-			RegistraLog(sMsgErr);
-			return 0;
-		}
-	}
+	/* Trae Correlativo de Hislec Refac */
+	$PREPARE selCorrHislecRefac FROM "SELECT NVL(MAX(corr_hislec_refac), 0) FROM hislec_refac
+		WHERE numero_cliente = ? ";
 	
-	alltrim(reg->sucursal, ' ');
-	alltrim(reg->dir_provincia, ' ');
-	alltrim(reg->dir_nom_provincia, ' ');
-	alltrim(reg->dir_partido, ' ');
-	alltrim(reg->dir_nom_partido, ' ');
-	alltrim(reg->dir_comuna, ' ');
-	alltrim(reg->dir_nom_comuna, ' ');
-	alltrim(reg->dir_cod_calle, ' ');
-	alltrim(reg->dir_nom_calle, ' ');
-	alltrim(reg->dir_numero, ' ');
-	alltrim(reg->dir_piso, ' ');
-	alltrim(reg->dir_depto, ' ');
-	alltrim(reg->telefono, ' ');
-	alltrim(reg->dir_cod_entre, ' ');
-	alltrim(reg->dir_nom_entre, ' ');
-	alltrim(reg->dir_cod_entre1, ' ');
-	alltrim(reg->dir_nom_entre1, ' ');
-	alltrim(reg->dir_observacion, ' ');
-	alltrim(reg->dir_cod_barrio, ' ');
-	alltrim(reg->dir_nom_barrio, ' ');
-	alltrim(reg->dir_manzana, ' ');
-	alltrim(reg->nombre, ' ');
-	alltrim(reg->tip_doc, ' ');
-	alltrim(sTieneCnr, ' ');
+	/* Graba Hislec Refac */
+	$PREPARE insHislecRefac FROM "INSERT INTO hislec_refac (numero_cliente, corr_facturacion, corr_refacturacion, 
+		numero_medidor, marca_medidor, correl_contador, tipo_lectura, fecha_lectura,
+		lectura_rectif, consumo_rectif, refacturado, corr_hislec_refac
+		)VALUES(?, ?, ?, 
+		?, ?, 1, ?, ?,
+		?, ?, 'S', ?) ";
+
+	/* Graba Hislec Refac Reac */
+	$PREPARE insHislecRefacReac FROM "INSERT INTO hislec_refac_reac (numero_cliente, corr_facturacion, corr_refacturacion,
+		numero_medidor, marca_medidor, tipo_lectura, fecha_lectura, lectu_rectif_reac,
+		consu_rectif_reac, refacturado, corr_hislec_refac, coseno_phi
+		)VALUES(?, ?, ?,
+		?, ?, ?, ?, ?,
+		?, 'S', ?, 100) ";
+
+	/* Sel Correlativo Cliente */
+	$PREPARE selCorrCliente FROM "SELECT corr_facturacion FROM cliente WHERE numero_cliente = ? ";
 	
-	if(sTieneCnr[0]=='S'){
-		reg->tiene_cnr=1;
-	}else{
-		reg->tiene_cnr=0;
-	}
-	
-	return 1;
+	/* Verifica Lectura Nueva */
+	$PREPARE selLectuNueva FROM "SELECT COUNT(*) FROM hislec
+		WHERE numero_cliente = ?
+		AND fecha_lectura = ?
+		AND tipo_lectura NOT IN (5, 6, 7) ";
+
 }
 
 
@@ -840,7 +700,7 @@ char	*sLinea;
 
 
 short VerificaCliente(icorrFactu, nroCliente)
-$int	*iCorrFactu;
+$int	*icorrFactu;
 $long 	nroCliente;
 {
 	$int	iCantidad;
@@ -881,6 +741,25 @@ $ClsLectura reg;
 			RegistraLog(sMsg);
 			return 0;
 		}
+		/* Actualiza medidor 2 */
+		$EXECUTE updMedid2 USING :reg.lecturaFacturacActiva, :reg.lecturaFacturacReactiva, 
+			:reg.nroCliente, :reg.nroMedidor, :reg.marcaMedidor;
+		
+		if(SQLCODE != 0){
+			sprintf(sMsg, "Cliente %ld Fallo UpdMedid2\n", reg.nroCliente);
+			RegistraLog(sMsg);
+			return 0;			
+		}
+	}else{
+		/* Actualiza Medidor 1 */
+		$EXECUTE updMedid1 USING :reg.lecturaFacturacActiva,
+			:reg.nroCliente, :reg.nroMedidor, :reg.marcaMedidor;
+		
+		if(SQLCODE != 0){
+			sprintf(sMsg, "Cliente %ld Fallo UpdMedid1\n", reg.nroCliente);
+			RegistraLog(sMsg);
+			return 0;			
+		}		
 	}
 	
 	/* Actualizar correlativo facturacion cliente */
@@ -891,6 +770,8 @@ $ClsLectura reg;
 		RegistraLog(sMsg);
 		return 0;
 	}
+	
+	
 	
 	return 1;
 }
@@ -906,7 +787,7 @@ $ClsLectura	reg;
 		:reg.nroMedidor,
 		:reg.marcaMedidor,
 		:reg.lecturaFacturacActiva,
-		:reg.lecturaTerrenoActiva,
+		:reg.lecturaFacturacActiva,
 		:reg.consumoActivo,
 		:reg.fechaLectura,
 		:reg.claveLectura,
@@ -929,14 +810,166 @@ $ClsLectura	reg;
 		:iCorrFactu,
 		:reg.nroMedidor,
 		:reg.marcaMedidor,
-		:reg.lecturaFacturacActiva,
-		:reg.lecturaTerrenoActiva,
-		:reg.consumoActivo,
+		:reg.lecturaFacturacReactiva,
+		:reg.lecturaFacturacReactiva,
+		:reg.consumoReactivo,
 		:reg.fechaLectura,
-		:reg.claveLectura,
 		:reg.tipoLectura;
 	
 	if(SQLCODE != 0)
+		return 0;
+		
+	return 1;
+}
+
+
+short CargaLecturaAjustada(reg)
+$ClsLectura reg;
+{
+	$int 	iCorrFactu=0;
+	$int	iCorrRefactu=0;
+	$int	iCorrHislecRefac=0;
+	char 	sMsg[1000];
+	
+	memset(sMsg, '\0', sizeof(sMsg));
+	
+	/* Buscar lectura original */
+	$EXECUTE selLectuOri INTO :iCorrFactu, :reg.tipoLectura USING :reg.nroCliente, :reg.fechaLectura;
+	
+	if(SQLCODE !=0){
+		sprintf(sMsg, "Cliente %ld Fecha Lectura %ld No se pudo encontrar.\n", reg.nroCliente, reg.fechaLectura);
+		RegistraLog(sMsg);
+		return 0;
+	}
+	
+	/* Trae Correlativo de Refac */
+	$EXECUTE selCorrRefac INTO :iCorrRefactu USING :reg.nroCliente;
+	
+	iCorrRefactu++;
+		
+	/* Trae Correlativo de Hislec Refac */
+	$EXECUTE selCorrHislecRefac INTO :iCorrHislecRefac USING :reg.nroCliente;
+	
+	iCorrHislecRefac++;
+	
+	/* Grabar Hislec Refac */
+	if(!GrabaAjusteActiva(iCorrFactu, iCorrRefactu, iCorrHislecRefac, reg)){
+		sprintf(sMsg, "Cliente %ld Fallo GrabaAjusteActiva\n", reg.nroCliente);
+		RegistraLog(sMsg);
+		return 0;		
+	}
+	
+	if(!risnull(CLONGTYPE, (char *) &(reg.consumoReactivo))){
+		/* Grabar Hislec Refac Reac*/
+		if(!GrabaAjusteReActiva(iCorrFactu, iCorrRefactu, iCorrHislecRefac, reg)){
+			sprintf(sMsg, "Cliente %ld Fallo GrabaAjusteReActiva\n", reg.nroCliente);
+			RegistraLog(sMsg);
+			return 0;		
+		}
+		
+		if(EsUltimaLectura(iCorrFactu, reg)){
+			/* Actualiza medidor 2 */
+			$EXECUTE updMedid2 USING :reg.lecturaFacturacActiva, :reg.lecturaFacturacReactiva, 
+				:reg.nroCliente, :reg.nroMedidor, :reg.marcaMedidor;
+			
+			if(SQLCODE != 0){
+				sprintf(sMsg, "Cliente %ld Fallo UpdMedid2\n", reg.nroCliente);
+				RegistraLog(sMsg);
+				return 0;			
+			}			
+		}
+	
+	}else{
+		if(EsUltimaLectura(iCorrFactu, reg)){
+			/* Actualiza medidor 1 */
+			$EXECUTE updMedid1 USING :reg.lecturaFacturacActiva
+				:reg.nroCliente, :reg.nroMedidor, :reg.marcaMedidor;
+			
+			if(SQLCODE != 0){
+				sprintf(sMsg, "Cliente %ld Fallo UpdMedid1\n", reg.nroCliente);
+				RegistraLog(sMsg);
+				return 0;			
+			}			
+		}		
+	}
+	
+	return 1;
+}
+
+short GrabaAjusteActiva(iCorrFactu, iCorrRefactu, iCorrHislecRefac, reg)
+$int		iCorrFactu;
+$int		iCorrRefactu;
+$int		iCorrHislecRefac;
+$ClsLectura	reg;
+{
+	
+	$EXECUTE insHisleRefac USING
+		:reg.nroCliente,
+		:iCorrFactu,
+		:iCorrRefactu,
+		:reg.nroMedidor,
+		:reg.marcaMedidor,
+		:reg.tipoLectura,
+		:reg.fechaLectura,
+		:reg.lecturaFacturacActiva,
+		:reg.consumoActivo,
+		:iCorrHislecRefac;
+	
+	if(SQLCODE != 0)
+		return 0;
+		
+	return 1;
+}
+
+short GrabaAjusteReActiva(iCorrFactu, iCorrRefactu, iCorrHislecRefac, reg)
+$int	iCorrFactu;
+$int	iCorrRefactu;
+$int	iCorrHislecRefac;
+$ClsLectura	reg;
+{
+	
+	$EXECUTE insHislecRefacReac USING
+		:reg.nroCliente,
+		:iCorrFactu,
+		:iCorrRefactu,
+		:reg.nroMedidor,
+		:reg.marcaMedidor,
+		:reg.tipoLectura,
+		:reg.fechaLectura,
+		:reg.lecturaFacturacReactiva,
+		:reg.consumoReactivo,
+		:iCorrHislecRefac;
+		
+	if(SQLCODE != 0)
+		return 0;
+	
+	return 1;
+}
+
+short EsUltimaLectura(iCorrFactu, reg)
+$int	iCorrFactu;
+$ClsLectura	reg;
+{
+	$int corrFacturacion=0;
+	
+	$EXECUTE selCorrCliente INTO :corrFacturacion USING :reg.nroCliente;
+	
+	if(corrFacturacion==iCorrFactu){
+		return 1;
+	}else{
+		return 0;
+	}
+	
+}
+
+short EsLecturaNueva(reg)
+$ClsLectura reg;
+{
+	$int iCant=0;
+	
+	$EXECUTE selLectuNueva INTO :iCant USING :reg.nroCliente, :reg.fechaLectura;
+	
+	if(iCant > 0)
 		return 0;
 		
 	return 1;

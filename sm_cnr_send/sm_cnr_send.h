@@ -31,6 +31,7 @@ $typedef struct{
 	char	sFechaNormalizacion[11];
 	char	sFechaInicioPeriodoCnrFacturado[11];
 	char	sFechaFinPeriodoCnrFacturado[11];
+	char	sIdInspeccion[15];
 	
 }ClsCNR;
 

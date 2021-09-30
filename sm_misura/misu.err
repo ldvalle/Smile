@@ -1,0 +1,20 @@
+
+ERROR ---- (sm_misura.ec linea: 138) -----------------------
+    SQLSTATE: 07001	SQLCODE: -254
+
+    EXCEPTIONS:  Number = 1	More? N
+    - - - - - - - - - - - - - - - - - - - -
+    EXCEPTION 1    : SQLSTATE = 07001
+    MESSAGE TEXT   : Using-clause does not match dynamic parameters
+    CLASS ORIGIN   : ISO 9075
+    SUBCLASS ORIGIN: ISO 9075
+
+
+    Informix error message
+    ----------------------
+
+    error -254, 0:
+    Too many or too few host variables given.
+
+------------------------------------------------------------
+

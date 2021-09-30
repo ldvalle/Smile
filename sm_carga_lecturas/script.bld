@@ -2,7 +2,7 @@ PROGRAM = sm_carga_lecturas.exe
 
 OBJECTS = sm_carga_lecturas.o 
 
-OBJS_LIB = sqlerror.o ustring.o macmath.o
+OBJS_LIB = sqlerror.o ustring.o macmath.o directory.o retornavar.o
 
 OTROS =
 
@@ -26,7 +26,10 @@ sm_carga_lecturas.o : sm_carga_lecturas.ec   \
               tabla_errores.h              \
               ustring.h					   \
               macmath.h                    \
-              synmail.h
+              synmail.h                     \
+              directory.h            \
+              retornavar.h
+              
 
 sqlerror.o : sqlerror.ec                   \
              sqlerror.h
@@ -35,5 +38,12 @@ ustring.o : ustring.c                      \
             ustring.h
 
 macmath.o : macmath.c 
+
+directory.o : directory.c				\
+              directory.h
+
+retornavar.o : retornavar.c         \
+               retornavar.h         \
+               ustring.h
 
 #ENDUPDATE#

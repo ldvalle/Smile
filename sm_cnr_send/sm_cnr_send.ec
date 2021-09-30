@@ -205,12 +205,12 @@ int	iRcv;
 	
 	sprintf(sCommand, "mv %s %s", sArchivoDos, sPathCopia);
 	iRcv=system(sCommand);		
-/*
+
    if(iRcv == 0){
       sprintf(sCommand, "rm %s", sArchivoUnx);
       iRcv=system(sCommand);
    }
-*/   
+
 }
 
 void FormateaArchivos(sSucur, indice)
@@ -261,7 +261,8 @@ $char sAux[1000];
 	strcat(sql, "ac.precedencia, ");
 	strcat(sql, "TRIM(ac.descripcion2), ");
 	strcat(sql, "s.mot_denuncia, ");
-	strcat(sql, "DATE(i.fecha_inspeccion) ");
+	strcat(sql, "DATE(i.fecha_inspeccion), ");
+	strcat(sql, "i.sucursal_rol || '-' || lpad(i.nro_inspeccion,8, '0') ");
 	strcat(sql, "FROM cnr_new cn, inspecc:in_inspeccion i, inspecc:in_solicitud s, anomalias_cnr ac ");
 	strcat(sql, "WHERE cn.fecha_inicio BETWEEN ? AND ? ");
 	/*strcat(sql, "AND cn.cod_estado IN ('01', '02', '03') ");*/
@@ -357,8 +358,8 @@ $ClsCNR *reg;
 		:reg->precedencia,
 		:reg->desc_categoria,
 		:reg->mot_denuncia_inspe,
-		:reg->lFechaInspeccion;
-		
+		:reg->lFechaInspeccion,
+		:reg->sIdInspeccion;
 
 
 	if ( SQLCODE != 0 ){
@@ -375,6 +376,7 @@ $ClsCNR *reg;
 	alltrim(reg->categoria, ' ');
 	alltrim(reg->desc_categoria, ' ');
 	alltrim(reg->mot_denuncia_inspe, ' ');
+	alltrim(reg->sIdInspeccion, ' ');
 
 	/* Buscar la OT */
     $EXECUTE selOT INTO :lFechaOT USING :reg->numero_cliente, :reg->lFechaInspeccion;
@@ -422,6 +424,7 @@ $ClsCNR *reg;
 
 	memset(reg->sFechaInicioPeriodoCnrFacturado, '\0', sizeof(reg->sFechaInicioPeriodoCnrFacturado));
 	memset(reg->sFechaFinPeriodoCnrFacturado, '\0', sizeof(reg->sFechaFinPeriodoCnrFacturado));
+	memset(reg->sIdInspeccion, '\0', sizeof(reg->sIdInspeccion));
    
 }
 
@@ -436,7 +439,7 @@ ClsCNR   reg;
 	alltrim(reg.sFechaNormalizacion, ' ');
 
 	/* ENELTEL */
-	sprintf(sLinea, "%ld|", reg.numero_cliente);
+	sprintf(sLinea, "%09ld|", reg.numero_cliente);
 	
 	/* STATO */
 	/*sprintf(sLinea, "%s%s|", sLinea, reg.cod_estado);*/
@@ -482,7 +485,7 @@ ClsCNR   reg;
 	
 	/* FECHA_INSPECCION */
 	sprintf(sLinea, "%s%s|", sLinea, reg.fecha_inspeccion);
-	
+
 	/* FECHA_NORMALIZACION */
 	if(strcmp(reg.sFechaNormalizacion,"")!=0){
 		sprintf(sLinea, "%s%s|", sLinea, reg.sFechaNormalizacion);
@@ -546,7 +549,7 @@ ClsCNR   reg;
 	/* FLAG_ENVIO_AUTOMATICO */
 	strcat(sLinea, "|");
 	/* ID_INSPECCION */
-	strcat(sLinea, "|");
+	sprintf(sLinea, "%s%s|", sLinea, reg.sIdInspeccion);
 	/* ID_INSPECCION_ANTERIOR */
 	strcat(sLinea, "|");
 	/* ANALISIS_DE_LA_INSPECCION */

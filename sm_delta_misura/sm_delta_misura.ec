@@ -396,7 +396,7 @@ $char sAux[1000];
 	/******** Cursor CLIENTES  ****************/	
 	strcpy(sql, "SELECT c.numero_cliente, s.fecha_novedad, s.tipo_ot, c.corr_facturacion, c.estado_cliente, NVL(p.fecha_move_in, s.fecha_novedad - 365)");
 	strcat(sql, "FROM ot_anagrafica s, cliente c, OUTER sap_regi_cliente p ");
-	strcat(sql, "WHERE s.fecha_unlock IS NULL ");
+	strcat(sql, "WHERE s.fecha_unlock IS NOT NULL ");
 	strcat(sql, "AND s.fecha_envia_misura IS NULL ");
 	/*strcat(sql, "AND s.fecha_novedad between ? AND ? ");*/
 	strcat(sql, "AND c.numero_cliente = s.numero_cliente ");
@@ -409,7 +409,7 @@ $char sAux[1000];
    /******** Cursor LECTURAS HISTO  ****************/
    $PREPARE selLecturas FROM "SELECT h.numero_cliente, 
       h.corr_facturacion, 
-      h.fecha_lectura, 
+      h.fecha_lectura +1, 
       h.tipo_lectura, 
       h.lectura_facturac, 
       h.lectura_terreno, 
@@ -449,10 +449,13 @@ $char sAux[1000];
 	
 	$DECLARE curLecturas CURSOR WITH HOLD FOR selLecturas;
    
-/*-----------*/
+/*------------*/
    $PREPARE selLecturasCM FROM "SELECT h.numero_cliente, 
-      h.corr_facturacion, 
-      h.fecha_lectura, 
+      h.corr_facturacion,
+      CASE
+		WHEN h.tipo_lectura = 6 THEN h.fecha_lectura + 1
+		ELSE h.fecha_lectura
+      END, 
       h.tipo_lectura, 
       h.lectura_facturac, 
       h.lectura_terreno, 
@@ -605,9 +608,9 @@ $char sAux[1000];
 		AND tipo_lectura NOT IN (5, 6) ";
 		
 	/* Fecha de Baja */
-	$PREPARE selBaja FROM "SELECT MAX(fecha_ejecucion) FROM ot_final
-		WHERE numero_cliente = ?
-		AND proced = 'RETCLI' ";
+	$PREPARE selBaja FROM "SELECT MAX(DATE(fecha_modif)) FROM modif
+	WHERE numero_cliente = ?
+	AND codigo_modif = '58' ";
 
 	/* Actualiza ot_ana */
 	$PREPARE updOT FROM "UPDATE ot_anagrafica SET
@@ -683,7 +686,7 @@ $ClsCliente	*reg;
     }
 
 	if(reg->iEstadoCliente != 0){
-		$EXECUTE selBaja INTO :reg->lFechaBaja USING :reg->lNroCliente;
+		$EXECUTE selBaja INTO :reg->lFechaBaja;
 		
 		if(SQLCODE != 0){
 			printf("Cliente %ld No se encontró fecha de Baja. Se reemplaza con Fecha Evento.\n", reg->lNroCliente);

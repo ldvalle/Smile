@@ -17,8 +17,10 @@ $include datetime.h;
 $typedef struct{
 	long 	nroCliente;
 	int		corrFacturacion;
+	char	sTipoTarifa[3];
 	long 	nroMedidor;
 	char	marcaMedidor[4];
+	char	modeloMedidor[3];
 	float 	lecturaFacturacActiva;
 	float 	lecturaTerrenoActiva;
 
@@ -57,9 +59,15 @@ static char 	*strReplace(char *, char *, char *);
 void	CerrarArchivos(void);
 
 short VerificaCliente(int *, long);
+short EsLecturaNueva(ClsLectura);
 short CargaLecturaFacturada( int, ClsLectura );
 short GrabaLectuActiva(int, ClsLectura);
 short GrabaLectuReActiva(int, ClsLectura);
+
+short CargaLecturaAjustada(ClsLectura);
+short GrabaAjusteActiva(int, int, int, ClsLectura);
+short GrabaAjusteReActiva(int, int, int, ClsLectura);
+short EsUltimaLectura(int, ClsLectura);
 
 char *substring(char *, int, int);
 int  instr(char *, char *);

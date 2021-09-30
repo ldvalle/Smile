@@ -117,6 +117,7 @@ char		unxCmd[500];
 				cantArchivos++;
 				
 				sprintf(unxCmd, "mv -f %s%s %s%s", sPathEntrada, sSoloArchivoEntrada, sPathRepo, sSoloArchivoEntrada);
+
 				if (system(unxCmd) != 0){
 					printf("Error al mover archivo [%s] al repositorio.\n", sSoloArchivoEntrada);
 					exit(1);
@@ -227,10 +228,11 @@ char	*sArchivo;
 	if(iLargo < 14){
 		return 0;
 	}
-	sSubCadena = substring(sArchivo, 1, 15);
+	sSubCadena = substring(sArchivo, 1, 13);
 	/*alltrim(sSubCadena, ' ');*/
 
 	if( strcmp(sSubCadena, sMascara)!= 0){
+		printf("[%s] [%s]\n", sSubCadena, sMascara);
 		return 0;
 	}
 
@@ -272,7 +274,7 @@ void CerrarArchivos(void){
 
 short ProcesaArchivo(){
 char			sLinea[10000];
-$ClsLectura	reg;
+$ClsCNR 		reg;
 long   			iLinea;
 char			sMsg[1000];
 $int			iCorrFactu;
@@ -290,6 +292,10 @@ $int			iCorrFactu;
 			
 			cantExpedientes++;
 			CargaRegistro( sLinea, &reg);
+
+printf("suc %s nroExpe %ld F.estado %s estado %s desde %ld hasta %ld monto %f\n", reg.sucursal,
+	reg.nroExpediente, reg.fechaEstado, reg.estado, reg.periodoDesde, reg.periodoHasta, reg.monto);
+	
 
 			strcpy(sMsg, "\tLinea Procesada\n");
 			RegistraLog(sMsg);
@@ -309,8 +315,9 @@ $int			iCorrFactu;
 				sprintf(sMsg, "No Verifica CNR [%s]\n", sLinea);
 				RegistraLog(sMsg);
 			}
-			
+
 		}
+
 		fgets(sLinea, 10000, pFileEntrada);
 		iLinea++;
 	}
@@ -319,8 +326,8 @@ $int			iCorrFactu;
 }
 
 void CargaRegistro( sLinea, reg)
-char			sLinea[10000];
-$ClsLectura	*reg;
+char	sLinea[10000];
+$ClsCNR	*reg;
 {
 	/*char 	sCampo[100];*/
 	int	iRcv;
@@ -349,7 +356,7 @@ $ClsLectura	*reg;
 		strcpy(reg->sucursal, sAux);
 		
 		memset(sAux, '\0', sizeof(sAux));
-		strcpy(sAux, substring(sCampo, 5, 9));
+		strcpy(sAux, substring(sCampo, 5, 10));
 		alltrim(sAux, ' ');
 		reg->nroExpediente = atol(sAux);
 	}
@@ -359,14 +366,14 @@ $ClsLectura	*reg;
 	if (RetornaCampoVar(sCampo, sLinea, '|', 2)){
 		alltrim(sCampo, ' ');
 		memset(sAux, '\0', sizeof(sAux));
-		dd/mm/aaaa HH:MM:SS
+
 		sprintf(sAux, "%c%c%c%c-%c%c-%c%c %c%c:%c%c:%c%c", sCampo[6],sCampo[7],sCampo[8],sCampo[9],
 			sCampo[3],sCampo[4],sCampo[0],sCampo[1],
 			sCampo[11],sCampo[12],sCampo[14],sCampo[15], sCampo[17],sCampo[18]);
 		strcpy(reg->fechaEstado, sAux);
 		
 		memset(sAux, '\0', sizeof(sAux));
-		sprintf(sAux, "%c%c/%c%c/%c%cc%c", sCampo[0],sCampo[1],sCampo[3],sCampo[4],sCampo[6],sCampo[7],sCampo[8,sCampo[9]);
+		sprintf(sAux, "%c%c/%c%c/%c%c%c%c", sCampo[0],sCampo[1],sCampo[3],sCampo[4],sCampo[6],sCampo[7],sCampo[8],sCampo[9]);
 		alltrim(sAux, ' ');
 		rdefmtdate(&(reg->lFechaCierre), "dd/mm/yyyy", sAux);
 		
@@ -379,17 +386,23 @@ $ClsLectura	*reg;
 	
 	/* Periodo Desde */
 	if (RetornaCampoVar(sCampo, sLinea, '|', 4)){
-		rdefmtdate(&(reg->periodoDesde), "dd/mm/yyyy", sCampo);
+		alltrim(sCampo, ' ');
+		if(strcmp(sCampo, "")!=0)
+			rdefmtdate(&(reg->periodoDesde), "dd/mm/yyyy", sCampo);
 	}
 
 	/* Periodo Hasta */
 	if (RetornaCampoVar(sCampo, sLinea, '|', 5)){
-		rdefmtdate(&(reg->periodoHasta), "dd/mm/yyyy", sCampo);
+		alltrim(sCampo, ' ');
+		if(strcmp(sCampo, "")!=0)
+			rdefmtdate(&(reg->periodoHasta), "dd/mm/yyyy", sCampo);
 	}
 	
 	/* Monto */
 	if (RetornaCampoVar(sCampo, sLinea, '|', 6)){
-		reg->monto = atof(sCampo);
+		alltrim(sCampo, ' ');
+		if(strcmp(sCampo, "")!=0)
+			reg->monto = atof(sCampo);
 	}
 	
 }
@@ -405,10 +418,9 @@ $ClsCNR	*reg;
 	rsetnull(CLONGTYPE, (char *) &(reg->periodoHasta));
 	rsetnull(CDOUBLETYPE, (char *) &(reg->monto));
 	
-	rsetnull(CLONGTYPE, (char *) &(reg->nroCliente));
+	rsetnull(CLONGTYPE, (char *) &(reg->numero_cliente));
 	rsetnull(CINTTYPE, (char *) &(reg->ano_expediente));
 	memset(reg->cod_estado, '\0', sizeof(reg->cod_estado));
-	rsetnull(CLONGTYPE, (char *) &(reg->nroCliente));
 	memset(reg->cod_provincia, '\0', sizeof(reg->cod_provincia));
 	memset(reg->cod_partido, '\0', sizeof(reg->cod_partido));
 	memset(reg->cod_localidad, '\0', sizeof(reg->cod_localidad));
@@ -477,7 +489,7 @@ $char sAux[1000];
 		AND sucursal = '0000'
 		AND codigo = 'SMIMAC'
 		AND fecha_activacion <= TODAY
-		AND (fecha_desactivac IS NULL OR fecha_desactivac > TODAY)";
+		AND (fecha_desactivac IS NULL OR fecha_desactivac > TODAY) ";
 
 	/* Recupera Expediente */
 	$PREPARE selCNR FROM "SELECT ano_expediente, 
@@ -546,6 +558,14 @@ $char sAux[1000];
 		WHERE sucursal = ?
 		AND nro_expediente = ? ";
 
+	/* Update CNR Anulada */
+	$PREPARE updCnrAnul FROM "UPDATE cnr_new SET
+		cod_estado = ?,
+		fecha_finalizacion = ?,
+		fecha_estado = ?
+		WHERE sucursal = ?
+		AND nro_expediente = ? ";	
+	
 	/* Actualiza Cliente */
 	$PREPARE updCliente FROM "UPDATE cliente SET
 		tiene_cnr = ?
@@ -590,7 +610,8 @@ $long 		lNroCliente;
 			  
 	if(SQLCODE != 0){
 		if(SQLCODE == 100){
-			sprintf(sMsg, "No se encontro Expediente CNR Sucursal %s Nro.Expediente %ld\n", reg->sucursal, reg->nroExpediente);
+			sprintf(sMsg, "No se encontro Expediente CNR Sucursal [%s] Nro.Expediente [%ld]\n", reg->sucursal, reg->nroExpediente);
+			RegistraLog(sMsg);
 			return 0;
 		}
 	}
@@ -607,7 +628,7 @@ $long 		lNroCliente;
 	if(reg->numero_cliente == 0){
 		/* Intento Buscar cliente x la direccion */
 
-		$EXECURE selCantCli INTO :iCantClientes USING
+		$EXECUTE selCantCli INTO :iCantClientes USING
 			:reg->cod_provincia,
 			:reg->cod_partido,
 			:reg->cod_localidad,
@@ -621,7 +642,7 @@ $long 		lNroCliente;
 		
 		if(SQLCODE == 0){
 			if(iCantClientes == 1){
-				$EXECURE selCliente INTO :reg->numero_cliente USING
+				$EXECUTE selCliente INTO :reg->numero_cliente USING
 					:reg->cod_provincia,
 					:reg->cod_partido,
 					:reg->cod_localidad,
@@ -642,10 +663,10 @@ $long 		lNroCliente;
 short ActualizaCNR(reg)
 $ClsCNR		reg;
 {
-	char	sMarca[2];
+	$char	sMarca[2];
 	
 	/* Actualizo CNR */
-	if(strcmp(reg.cod_estado, "05")== 0 || strcmp(reg.cod_estado, "99")== 0){
+	if(strcmp(reg.cod_estado, "05")== 0 ){
 		$EXECUTE updCnrCerrado USING :reg.cod_estado,
 			:reg.lFechaCierre,
 			:reg.fechaEstado,
@@ -653,7 +674,15 @@ $ClsCNR		reg;
 			:reg.periodoHasta,
 			:reg.monto,
 			:reg.sucursal,
-			:nroExpediente;
+			:reg.nroExpediente;
+			
+	}else if(strcmp(reg.cod_estado, "99")== 0){
+		$EXECUTE updCnrAnul USING :reg.cod_estado,
+			:reg.lFechaCierre,
+			:reg.fechaEstado,
+			:reg.sucursal,
+			:reg.nroExpediente;
+		
 	}else{
 		$EXECUTE updCnrAbierto USING :reg.cod_estado,
 			:reg.fechaEstado,
@@ -661,7 +690,7 @@ $ClsCNR		reg;
 			:reg.periodoHasta,
 			:reg.monto,
 			:reg.sucursal,
-			:nroExpediente;
+			:reg.nroExpediente;
 	}
 	
 	if(SQLCODE != 0)
@@ -671,13 +700,13 @@ $ClsCNR		reg;
 	/* Actualizo Cliente */
 	if((strcmp(reg.cod_estado, "05")== 0  || strcmp(reg.cod_estado, "06")== 0 || strcmp(reg.cod_estado, "99")== 0) && (reg.numero_cliente > 0)){
 		memset(sMarca, '\0', sizeof(sMarca));
-		if(strcmp(reg.cod_estado, "05")== 0
+		if(strcmp(reg.cod_estado, "05")== 0)
 			strcpy(sMarca, "S");
 
-		if(strcmp(reg.cod_estado, "06")== 0
+		if(strcmp(reg.cod_estado, "06")== 0)
 			strcpy(sMarca, "N");
 
-		if(strcmp(reg.cod_estado, "99")== 0
+		if(strcmp(reg.cod_estado, "99")== 0)
 			strcpy(sMarca, "N");		
 			
 		$EXECUTE updCliente USING :sMarca, :reg.numero_cliente;
